@@ -21,7 +21,7 @@ function MyBookshieldPage() {
 
   const handleReturn = async (bookKey) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/return/${bookKey}`, {
+      const res = await fetch(`http://localhost:5000/api/books/${bookKey}`, {
         method: "DELETE",
       });
       const result = await res.json();

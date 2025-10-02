@@ -34,7 +34,7 @@ def home():
 # ---------------------------
 # API: Mượn sách
 # ---------------------------
-@app.route("/api/borrow", methods=["POST"])
+@app.route("/api/book", methods=["POST"])
 def borrow_book():
     data = request.get_json()
     book_key = data.get("book_key")
@@ -85,7 +85,7 @@ def get_borrowed():
 # ---------------------------
 # API: Trả sách (DELETE)
 # ---------------------------
-@app.route("/api/return/<book_key>", methods=["DELETE"])
+@app.route("/api/books/<book_key>", methods=["DELETE"])
 def return_book(book_key):
     print(f"Request to return book with key: {book_key}")
     conn = sqlite3.connect(DB_NAME)
