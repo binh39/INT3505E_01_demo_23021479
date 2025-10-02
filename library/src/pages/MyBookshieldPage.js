@@ -64,11 +64,7 @@ function MyBookshieldPage() {
       <div className="mybookshield-right">
         {selectedBook ? (
           <>
-            <img
-              src={selectedBook.cover_url}
-              alt={selectedBook.title}
-              style={{ width: "150px", marginBottom: "10px" }}
-            />
+            <img src={selectedBook.cover_url} alt={selectedBook.title} />
             <h3>{selectedBook.title}</h3>
             <p>
               <strong>Author:</strong> {selectedBook.author}

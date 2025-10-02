@@ -88,7 +88,6 @@ function LibraryPage() {
             <img
               src={getCoverUrl(selectedBook.cover_i)}
               alt={selectedBook.title}
-              style={{ width: "150px", marginBottom: "10px" }}
             />
             <h3>{selectedBook.title}</h3>
             <p>

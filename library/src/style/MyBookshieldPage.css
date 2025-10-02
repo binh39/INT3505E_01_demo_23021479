@@ -32,10 +32,27 @@
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   cursor: pointer;
 }
+.book-item div strong {
+  font-size: 30px;
+  font-weight: bold;
+}
+.book-item div p {
+  font-size: 20px;
+}
 
 .book-item img {
   width: 130px;
   height: 180px;
   object-fit: cover;
   border-radius: 4px;
+}
+
+.mybookshield-right h3 {
+  font-size: 30px;
+}
+.mybookshield-right p {
+  font-size: 20px;
+}
+.mybookshield-right button {
+  font-size: 18px;
 }
