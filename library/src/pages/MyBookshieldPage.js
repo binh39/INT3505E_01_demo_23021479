@@ -7,9 +7,9 @@ function MyBookshieldPage() {
 
   const fetchBorrowedBooks = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/books");
+      const res = await fetch("http://localhost:5001/api/books");
       const data = await res.json();
-      setBorrowedBooks(data);
+      setBorrowedBooks(data.data);
     } catch (err) {
       console.error("Lỗi khi lấy sách đã mượn:", err);
     }
@@ -21,7 +21,7 @@ function MyBookshieldPage() {
 
   const handleReturn = async (bookKey) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/books/${bookKey}`, {
+      const res = await fetch(`http://localhost:5001/api/books/${bookKey}`, {
         method: "DELETE",
       });
       const result = await res.json();
