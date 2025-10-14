@@ -1,15 +1,24 @@
-from flask import Flask, request, jsonify
-import sqlite3
+from flask import Flask, request, jsonify, make_response
+import sqlite3, hashlib, json
 from flask_cors import CORS
 
 app = Flask(__name__)
-CORS(app)  # Cho phép React frontend gọi API
+CORS(app)
 
 DB_NAME = "books.db"
+API_TOKEN = "demo123"
 
 # ---------------------------
-# Khởi tạo database nếu chưa có
+# Hàm tiện ích
 # ---------------------------
+def check_auth():
+    """Kiểm tra token Bearer."""
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return False
+    token = auth_header.split(" ")[1]
+    return token == API_TOKEN
+
 def init_db():
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
@@ -29,7 +38,17 @@ init_db()
 
 @app.route("/")
 def home():
-    return "Flask server is running!"
+    return "Flask Library API - Version 3 Cacheable"
+
+# ---------------------------
+# Middleware: kiểm tra token
+# ---------------------------
+@app.before_request
+def require_auth():
+    if request.path == "/" or request.method == "OPTIONS":
+        return
+    if not check_auth():
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
 
 # ---------------------------
 # API: Mượn sách
@@ -47,15 +66,13 @@ def borrow_book():
 
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
-    # Kiểm tra xem đã mượn chưa 
     c.execute("SELECT * FROM borrowed_books WHERE book_key = ?", (book_key,))
     existing = c.fetchone()
 
     if existing:
         conn.close()
-        return jsonify({"status": "exists", "message": "You have already borrowed this book"}), 200
+        return jsonify({"status": "exists", "message": "Already borrowed"}), 200
 
-    # Chưa có thì thêm vào database
     c.execute(
         "INSERT INTO borrowed_books (book_key, title, author, cover_url) VALUES (?, ?, ?, ?)",
         (book_key, title, author, cover_url)
@@ -63,24 +80,13 @@ def borrow_book():
     conn.commit()
     conn.close()
 
-    return jsonify({
-        "status": "success",
-        "message": "Borrowed book successfully",
-        "data": {
-            "book_key": book_key,
-            "_links": {
-                "self": {"href": f"/api/books/{book_key}"},
-                "return": {"href": f"/api/books/{book_key}", "method": "DELETE"},
-                "all_books": {"href": "/api/books", "method": "GET"}
-            }
-        }
-    }), 201
+    return jsonify({"status": "success", "message": "Borrowed successfully"}), 201
 
 # ---------------------------
-# API lấy danh sách đã mượn
+# API: Lấy danh sách sách đã mượn (CACHE)
 # ---------------------------
 @app.route("/api/books", methods=["GET"])
-def get_borrowed():
+def get_books():
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     c.execute("SELECT book_key, title, author, cover_url FROM borrowed_books")
@@ -88,60 +94,40 @@ def get_borrowed():
     conn.close()
 
     books = [
-        {
-            "book_key": r[0],
-            "title": r[1],
-            "author": r[2],
-            "cover_url": r[3],
-            "_links": {
-                "self": {"href": f"/api/books/{r[0]}"},
-                "return": {"href": f"/api/books/{r[0]}", "method": "DELETE"}
-            }
-        }
+        {"book_key": r[0], "title": r[1], "author": r[2], "cover_url": r[3]}
         for r in rows
     ]
 
-    response = jsonify({
-        "status": "success",
-        "message": "Get borrowed books successfully",
-        "data": books,
-        "_links": {
-            "self": {"href": "/api/books"},
-            "borrow": {"href": "/api/book", "method": "POST"}
-        }
-    })
-
-    # --- Header cache và ETag ---
-    import hashlib, json
+    # Tạo ETag từ dữ liệu
     etag = hashlib.md5(json.dumps(books, sort_keys=True).encode()).hexdigest()
-    response.headers["Cache-Control"] = "public, max-age=60"
-    response.headers["ETag"] = etag
-
-    # --- xử lý điều kiện "If-None-Match" từ client ---
     client_etag = request.headers.get("If-None-Match")
+    print(etag)
+    print(client_etag)
     if client_etag == etag:
-        # Dữ liệu chưa thay đổi → không cần gửi lại toàn bộ
         return "", 304
 
-    return response
+    response = make_response(jsonify(books))
+    response.headers["Cache-Control"] = "public, max-age=60"   # cache 1 phút
+    response.headers["ETag"] = etag
+    response.headers["Access-Control-Expose-Headers"] = "ETag"
+
+    return response, 200
 
 # ---------------------------
-# API: Trả sách (DELETE)
+# API: Trả sách
 # ---------------------------
 @app.route("/api/books/<book_key>", methods=["DELETE"])
 def return_book(book_key):
-    print(f"Request to return book with key: {book_key}")
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
-
     c.execute("DELETE FROM borrowed_books WHERE book_key = ?", (book_key,))
     deleted = c.rowcount
     conn.commit()
     conn.close()
 
     if deleted == 0:
-        return jsonify({"status": "error", "message": "Cannot find book to return"}), 404
-    return jsonify({"status": "success", "message": "Returned book successfully"}), 200
+        return jsonify({"status": "error", "message": "Book not found"}), 404
+    return jsonify({"status": "success", "message": "Returned successfully"}), 200
 
 
 if __name__ == "__main__":

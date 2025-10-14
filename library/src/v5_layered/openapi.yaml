@@ -1,0 +1,130 @@
+openapi: 3.0.3
+info:
+  title: Library API
+  version: 1.0.0
+  description: >
+    Simple RESTful API for managing borrowed books.  
+    Supports operations for borrowing, returning, and listing books.
+
+servers:
+  - url: http://localhost:5000
+
+paths:
+  /:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: Service is running
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+  /api/books:
+    get:
+      summary: Get all borrowed books
+      description: Returns a list of all borrowed books.
+      responses:
+        "200":
+          description: A JSON array of books
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Book"
+        "304":
+          description: Not Modified (ETag match)
+    post:
+      summary: Borrow a new book
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookInput"
+      responses:
+        "201":
+          description: Successfully borrowed
+        "200":
+          description: Already borrowed
+        "400":
+          description: Missing book_key
+
+  /api/books/{book_key}:
+    get:
+      summary: Get details of a borrowed book
+      parameters:
+        - name: book_key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Book detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Book"
+        "404":
+          description: Book not found
+    delete:
+      summary: Return a borrowed book
+      parameters:
+        - name: book_key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Book returned
+        "404":
+          description: Book not found
+
+components:
+  schemas:
+    Book:
+      type: object
+      properties:
+        book_key:
+          type: string
+          example: "OL5964309W"
+        title:
+          type: string
+          example: "Clean Code"
+        author:
+          type: string
+          example: "Robert C. Martin"
+        cover_url:
+          type: string
+          format: uri
+          example: "https://covers.openlibrary.org/b/id/123456-L.jpg"
+
+    BookInput:
+      type: object
+      required: [book_key, title, author]
+      properties:
+        book_key:
+          type: string
+          example: "OL1234567W"
+        title:
+          type: string
+          example: "The Pragmatic Programmer"
+        author:
+          type: string
+          example: "Andy Hunt"
+        cover_url:
+          type: string
+          example: "https://covers.openlibrary.org/b/id/654321-L.jpg"

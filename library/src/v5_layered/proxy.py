@@ -31,46 +31,59 @@ def rate_limit():
             }), 429
         request_counts[ip].append(now)
 
+@app.route("/")
+def home():
+    return "Proxy Layer (Port 5001) - Cache + Rate Limiting + Forwarding"
+
+
 # ----------------------------
-# CACHING - Cache danh sách sách đã mượn
+# ETag CACHE
 # ----------------------------
-cache_data = None
-cache_time = 0
-CACHE_TTL = 600  # cache 600 giây
+etag_cache = None
+data_cache = None
 
 @app.route("/api/books", methods=["GET"])
 def proxy_books_list():
-    global cache_data, cache_time
-    now = time.time()
+    global etag_cache, data_cache
 
-    # Nếu cache còn hiệu lực, return cache
-    if cache_data and now - cache_time < CACHE_TTL:
-        print("Proxy return cache data")
-        return Response(cache_data, status=200, mimetype="application/json")
+    headers = {}
+    if etag_cache:
+        headers["If-None-Match"] = etag_cache
+    auth_header = request.headers.get("Authorization")
+    if auth_header:
+        headers["Authorization"] = auth_header
 
-    # Nếu cache hết hạn, gọi backend thật
-    resp = requests.get(f"{BACKEND_URL}/api/books")
-    cache_data = resp.content
-    cache_time = now
-    print("Proxy call backend to get new data")
+    resp = requests.get(f"{BACKEND_URL}/api/books", headers=headers)
 
+    if resp.status_code == 304 and data_cache:
+        print("Proxy: ETag matched, return cached data")
+        return Response(data_cache, status=200, mimetype="application/json")
+
+    if resp.status_code == 200:
+        etag_cache = resp.headers.get("ETag")
+        data_cache = resp.content
+        print(f"Proxy: updated cache with new ETag: {etag_cache}")
+
+    # Forward toàn bộ response xuống client
     return Response(resp.content, resp.status_code, resp.headers.items())
 
 # ----------------------------
-# DELETE - Khi trả sách → xóa cache
+# DELETE - Trả sách → Xóa cache
 # ----------------------------
 @app.route("/api/books/<book_key>", methods=["DELETE"])
 def proxy_return_book(book_key):
-    global cache_data, cache_time
-    url = f"{BACKEND_URL}/api/books/{book_key}"
+    global data_cache, etag_cache
 
-    # Gọi backend thật
-    resp = requests.delete(url)
+    headers = {}
+    auth_header = request.headers.get("Authorization")
+    if auth_header:
+        headers["Authorization"] = auth_header
 
-    # Nếu trả sách thành công → xóa cache để đồng bộ
+    resp = requests.delete(f"{BACKEND_URL}/api/books/{book_key}", headers=headers)
+
     if resp.status_code == 200:
-        cache_data = None
-        cache_time = 0
+        data_cache = None
+        etag_cache = None
         print(f"Cache invalidated after returning book: {book_key}")
 
     return Response(resp.content, resp.status_code, resp.headers.items())

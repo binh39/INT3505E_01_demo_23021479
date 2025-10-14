@@ -1,26 +1,34 @@
 .library-container {
   display: flex;
-  height: calc(100vh - 60px); /* nếu có header */
+  height: calc(100vh - 45px); /* nếu có header */
+  overflow: hidden;
+  width: 100%;
 }
 
 .library-main {
   flex: 3;
-  padding: 20px;
+  padding: 15px;
   background-color: #f5f5f5;
   overflow-y: auto;
 }
 
+.library-main h2 {
+  margin-bottom: 4px;
+  margin-top: 0px;
+}
+
 .library-main input[type="text"] {
   width: 100%;
+  box-sizing: border-box;
   padding: 8px;
-  margin-bottom: 20px;
+  margin-bottom: 15px;
   font-size: 16px;
 }
 
 .book-list {
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  gap: 10px;
 }
 
 .book-item {
@@ -34,16 +42,16 @@
 }
 
 .book-item div strong {
-  font-size: 30px;
+  font-size: 20px;
   font-weight: bold;
 }
 .book-item div p {
-  font-size: 20px;
+  font-size: 12px;
 }
 
 .book-item img {
-  width: 130px;
-  height: 180px;
+  width: 80px;
+  height: 110px;
   object-fit: cover;
   border-radius: 4px;
 }

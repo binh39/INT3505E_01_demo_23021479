@@ -33,9 +33,13 @@ function LibraryPage() {
     console.log("Borrowing book with ID:", bookId, "from key:", book.key);
 
     try {
+      const API_TOKEN = "demo123";
       const res = await fetch("http://localhost:5001/api/books", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${API_TOKEN}`,
+        },
         body: JSON.stringify(payload),
       });
 

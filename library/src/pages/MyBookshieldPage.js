@@ -7,9 +7,34 @@ function MyBookshieldPage() {
 
   const fetchBorrowedBooks = async () => {
     try {
-      const res = await fetch("http://localhost:5001/api/books");
-      const data = await res.json();
-      setBorrowedBooks(data.data);
+      const API_TOKEN = "demo123";
+      const res = await fetch("http://localhost:5001/api/books", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${API_TOKEN}`,
+          "If-None-Match": localStorage.getItem("etag") || "",
+        },
+      });
+
+      if (res.status === 304) {
+        console.log("Dữ liệu không thay đổi, sử dụng cache.");
+        const cachedBooks = JSON.parse(localStorage.getItem("books"));
+        setBorrowedBooks(Array.isArray(cachedBooks) ? cachedBooks : []);
+        console.log(selectedBook);
+        return;
+      } else {
+        const data = await res.json();
+        const books = Array.isArray(data) ? data : data.data ?? [];
+        localStorage.setItem("books", JSON.stringify(books));
+        console.log("New data:", books);
+
+        // Lưu lại ETag cho lần sau
+        const newEtag = res.headers.get("ETag");
+        console.log("Saved ETag:", newEtag);
+        localStorage.setItem("etag", newEtag);
+
+        setBorrowedBooks(books);
+      }
     } catch (err) {
       console.error("Lỗi khi lấy sách đã mượn:", err);
     }
@@ -21,8 +46,12 @@ function MyBookshieldPage() {
 
   const handleReturn = async (bookKey) => {
     try {
+      const API_TOKEN = "demo123";
       const res = await fetch(`http://localhost:5001/api/books/${bookKey}`, {
         method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${API_TOKEN}`,
+        },
       });
       const result = await res.json();
       alert(result.message);

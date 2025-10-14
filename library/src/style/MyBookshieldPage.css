@@ -1,6 +1,6 @@
 .mybookshield-container {
   display: flex;
-  height: calc(100vh - 60px);
+  height: calc(100vh - 45px);
 }
 
 .mybookshield-left {
@@ -20,7 +20,7 @@
 .book-list {
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  gap: 10px;
 }
 
 .book-item {
@@ -33,16 +33,16 @@
   cursor: pointer;
 }
 .book-item div strong {
-  font-size: 30px;
+  font-size: 20px;
   font-weight: bold;
 }
 .book-item div p {
-  font-size: 20px;
+  font-size: 12px;
 }
 
 .book-item img {
-  width: 130px;
-  height: 180px;
+  width: 80px;
+  height: 110px;
   object-fit: cover;
   border-radius: 4px;
 }
