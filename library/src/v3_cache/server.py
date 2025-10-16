@@ -107,7 +107,8 @@ def get_books():
         return "", 304
 
     response = make_response(jsonify(books))
-    response.headers["Cache-Control"] = "public, max-age=60"   # cache 1 phút
+    
+    response.headers["Cache-Control"] = "public, max-age=600"
     response.headers["ETag"] = etag
     response.headers["Access-Control-Expose-Headers"] = "ETag"
 

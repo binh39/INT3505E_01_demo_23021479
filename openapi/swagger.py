@@ -4,22 +4,16 @@ import os, yaml
 
 app = Flask(__name__)
 
-# -----------------------------
-# Load và cung cấp OpenAPI spec
-# -----------------------------
 @app.route("/openapi.yaml")
 def openapi_spec():
     return send_from_directory(os.getcwd(), "openapi.yaml", mimetype="text/yaml")
 
-# -----------------------------
-# Swagger UI setup
-# -----------------------------
 SWAGGER_URL = "/docs"
 API_URL = "/openapi.yaml"
 
 swaggerui_blueprint = get_swaggerui_blueprint(
-    SWAGGER_URL,  # Swagger UI endpoint
-    API_URL,      # OpenAPI spec
+    SWAGGER_URL,
+    API_URL, 
     config={"app_name": "Library API Documentation"}
 )
 

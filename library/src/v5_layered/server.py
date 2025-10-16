@@ -11,13 +11,6 @@ API_TOKEN = "demo123"
 # ---------------------------
 # Hàm tiện ích
 # --------------------------
-def check_auth():
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
-        return False
-    token = auth_header.split(" ")[1]
-    return token == API_TOKEN
-
 def init_db():
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
@@ -34,6 +27,13 @@ def init_db():
     conn.close()
 
 init_db()
+
+def check_auth():
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return False
+    token = auth_header.split(" ")[1]
+    return token == API_TOKEN
 
 @app.before_request
 def require_auth():
@@ -180,7 +180,9 @@ def get_book(book_key):
 # ---------------------------
 # API: Trả sách
 # ---------------------------
+
 @app.route("/api/books/<book_key>", methods=["DELETE"])
+
 def return_book(book_key):
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
@@ -199,7 +201,7 @@ def return_book(book_key):
             "all": {"href": "/api/books", "method": "GET"},
             "borrow": {"href": "/api/books", "method": "POST"}
         }
-    }), 200
+    }), 200 
 
 
 if __name__ == "__main__":
