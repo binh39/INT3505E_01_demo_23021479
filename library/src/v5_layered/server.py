@@ -197,9 +197,11 @@ def return_book(book_key):
     return jsonify({
         "status": "success",
         "message": "Returned successfully",
-        "_links": {
-            "all": {"href": "/api/books", "method": "GET"},
-            "borrow": {"href": "/api/books", "method": "POST"}
+        "data": {
+            "_links": {
+                "all": {"href": "/api/books", "method": "GET"},
+                "borrow": {"href": "/api/books", "method": "POST"}
+            }
         }
     }), 200 
 

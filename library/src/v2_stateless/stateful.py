@@ -34,7 +34,7 @@ def get_books():
     books = BOOK_DATA.get(user_id, [])
     return jsonify({"user_id": user_id, "books": books})
 
-# --- 3. Endpoint CODE ON DEMAND (Mã theo yêu cầu) ---
+# CODE ON DEMAND
 
 @app.route("/api/widget/promo", methods=["GET"])
 def get_promo_code():
