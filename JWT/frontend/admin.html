@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin Dashboard - Library System</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: #f5f5f5;
+      }
+
+      .navbar {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 15px 30px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      }
+
+      .navbar h1 {
+        font-size: 24px;
+      }
+
+      .navbar-right {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+      }
+
+      .user-info {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .btn-logout {
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        padding: 8px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background 0.3s;
+      }
+
+      .btn-logout:hover {
+        background: rgba(255, 255, 255, 0.3);
+      }
+
+      .container {
+        max-width: 1400px;
+        margin: 30px auto;
+        padding: 0 20px;
+      }
+
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+      }
+
+      .stat-card {
+        background: white;
+        padding: 25px;
+        border-radius: 15px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        text-align: center;
+      }
+
+      .stat-card .icon {
+        font-size: 40px;
+        margin-bottom: 10px;
+      }
+
+      .stat-card .value {
+        font-size: 32px;
+        font-weight: bold;
+        color: #667eea;
+        margin-bottom: 5px;
+      }
+
+      .stat-card .label {
+        font-size: 14px;
+        color: #666;
+      }
+
+      .section {
+        background: white;
+        border-radius: 15px;
+        padding: 25px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      }
+
+      .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding-bottom: 15px;
+        border-bottom: 2px solid #f0f0f0;
+      }
+
+      .section-header h2 {
+        color: #333;
+        font-size: 22px;
+      }
+
+      .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        padding: 10px 25px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 600;
+        transition: transform 0.2s;
+      }
+
+      .btn-primary:hover {
+        transform: translateY(-2px);
+      }
+
+      .btn-edit {
+        background: #ffa726;
+        color: white;
+        border: none;
+        padding: 6px 15px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 13px;
+        margin-right: 5px;
+      }
+
+      .btn-delete {
+        background: #ef5350;
+        color: white;
+        border: none;
+        padding: 6px 15px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 13px;
+      }
+
+      .books-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 20px;
+      }
+
+      .book-card {
+        border: 1px solid #e0e0e0;
+        border-radius: 10px;
+        padding: 15px;
+        transition: transform 0.2s, box-shadow 0.2s;
+      }
+
+      .book-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+      }
+
+      .book-card img {
+        width: 100%;
+        height: 200px;
+        object-fit: cover;
+        border-radius: 8px;
+        margin-bottom: 10px;
+      }
+
+      .book-title {
+        font-weight: bold;
+        font-size: 16px;
+        margin-bottom: 5px;
+        color: #333;
+      }
+
+      .book-author {
+        color: #666;
+        font-size: 14px;
+        margin-bottom: 10px;
+      }
+
+      .book-info {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 10px;
+        font-size: 13px;
+      }
+
+      .book-actions {
+        display: flex;
+        gap: 5px;
+      }
+
+      .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+      }
+
+      .modal.active {
+        display: flex;
+      }
+
+      .modal-content {
+        background: white;
+        border-radius: 15px;
+        padding: 30px;
+        width: 90%;
+        max-width: 500px;
+        max-height: 90vh;
+        overflow-y: auto;
+      }
+
+      .modal-header {
+        margin-bottom: 20px;
+        padding-bottom: 15px;
+        border-bottom: 2px solid #f0f0f0;
+      }
+
+      .modal-header h3 {
+        color: #333;
+        font-size: 22px;
+      }
+
+      .form-group {
+        margin-bottom: 20px;
+      }
+
+      .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        color: #333;
+        font-weight: 500;
+        font-size: 14px;
+      }
+
+      .form-group input {
+        width: 100%;
+        padding: 10px;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        font-size: 14px;
+      }
+
+      .form-group input:focus {
+        outline: none;
+        border-color: #667eea;
+      }
+
+      .form-actions {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+        margin-top: 20px;
+      }
+
+      .btn-cancel {
+        background: #ccc;
+        color: #333;
+        border: none;
+        padding: 10px 25px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+      }
+
+      .loading {
+        text-align: center;
+        padding: 40px;
+        color: #666;
+      }
+
+      .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: #999;
+      }
+
+      .empty-state-icon {
+        font-size: 60px;
+        margin-bottom: 15px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="navbar">
+      <h1>📚 Library Admin Dashboard</h1>
+      <div class="navbar-right">
+        <div class="user-info">
+          <span id="username">Admin</span>
+          <span>👤</span>
+        </div>
+        <button class="btn-logout" onclick="logout()">Đăng xuất</button>
+      </div>
+    </div>
+
+    <div class="container">
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card">
+          <div class="icon">📚</div>
+          <div class="value" id="totalBooks">-</div>
+          <div class="label">Tổng số sách</div>
+        </div>
+        <div class="stat-card">
+          <div class="icon">📖</div>
+          <div class="value" id="totalCopies">-</div>
+          <div class="label">Tổng số bản sao</div>
+        </div>
+        <div class="stat-card">
+          <div class="icon">📤</div>
+          <div class="value" id="borrowedCount">-</div>
+          <div class="label">Đang được mượn</div>
+        </div>
+        <div class="stat-card">
+          <div class="icon">👥</div>
+          <div class="value" id="userCount">-</div>
+          <div class="label">Số người dùng</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">
+          <h2>Quản lý sách trong thư viện</h2>
+          <button class="btn-primary" onclick="openAddModal()">
+            ➕ Thêm sách mới
+          </button>
+        </div>
+        <div id="booksContainer" class="books-grid">
+          <div class="loading">Đang tải...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Thêm/Sửa sách -->
+    <div id="bookModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 id="modalTitle">Thêm sách mới</h3>
+        </div>
+        <form id="bookForm">
+          <input type="hidden" id="bookId" />
+          <div class="form-group">
+            <label for="bookKey">Book Key *</label>
+            <input type="text" id="bookKey" required />
+          </div>
+          <div class="form-group">
+            <label for="title">Tiêu đề *</label>
+            <input type="text" id="title" required />
+          </div>
+          <div class="form-group">
+            <label for="author">Tác giả</label>
+            <input type="text" id="author" />
+          </div>
+          <div class="form-group">
+            <label for="coverUrl">URL Bìa sách</label>
+            <input type="text" id="coverUrl" />
+          </div>
+          <div class="form-group">
+            <label for="quantity">Số lượng *</label>
+            <input type="number" id="quantity" min="1" value="1" required />
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn-cancel" onclick="closeModal()">
+              Hủy
+            </button>
+            <button type="submit" class="btn-primary">Lưu</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script>
+      const API_URL = "http://localhost:5000";
+      let token = localStorage.getItem("token");
+      let currentEditId = null;
+
+      // Kiểm tra đăng nhập và quyền admin
+      function checkAuth() {
+        if (!token) {
+          window.location.href = "login.html";
+          return false;
+        }
+
+        const user = JSON.parse(localStorage.getItem("user"));
+        if (!user || user.role !== "admin") {
+          alert("Bạn không có quyền truy cập trang này");
+          window.location.href = "login.html";
+          return false;
+        }
+
+        document.getElementById("username").textContent = user.username;
+        return true;
+      }
+
+      async function apiCall(url, options = {}) {
+        const headers = {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+          ...options.headers,
+        };
+
+        try {
+          const response = await fetch(`${API_URL}${url}`, {
+            ...options,
+            headers,
+          });
+
+          if (response.status === 401) {
+            alert("Phiên đăng nhập hết hạn");
+            logout();
+            return null;
+          }
+
+          return await response.json();
+        } catch (error) {
+          console.error("API Error:", error);
+          alert("Lỗi kết nối đến server");
+          return null;
+        }
+      }
+
+      async function loadStatistics() {
+        const data = await apiCall("/api/admin/statistics");
+        if (data && data.status === "success") {
+          document.getElementById("totalBooks").textContent =
+            data.data.total_books;
+          document.getElementById("totalCopies").textContent =
+            data.data.total_copies;
+          document.getElementById("borrowedCount").textContent =
+            data.data.borrowed_count;
+          document.getElementById("userCount").textContent =
+            data.data.user_count;
+        }
+      }
+
+      async function loadBooks() {
+        const data = await apiCall("/api/admin/books");
+        const container = document.getElementById("booksContainer");
+
+        if (!data || data.status !== "success") {
+          container.innerHTML =
+            '<div class="empty-state"><div class="empty-state-icon">❌</div><p>Không thể tải dữ liệu</p></div>';
+          return;
+        }
+
+        if (data.data.length === 0) {
+          container.innerHTML =
+            '<div class="empty-state"><div class="empty-state-icon">📚</div><p>Chưa có sách nào trong thư viện</p></div>';
+          return;
+        }
+
+        container.innerHTML = data.data
+          .map(
+            (book) => `
+                <div class="book-card">
+                    <img src="${
+                      book.cover_url ||
+                      "https://via.placeholder.com/200x300?text=No+Cover"
+                    }" alt="${book.title}">
+                    <div class="book-title">${book.title}</div>
+                    <div class="book-author">📝 ${book.author || "N/A"}</div>
+                    <div class="book-info">
+                        <span>📦 Tổng: ${book.quantity}</span>
+                        <span>✅ Còn: ${book.available}</span>
+                    </div>
+                    <div class="book-info">
+                        <span style="font-size: 11px; color: #999;">ID: ${
+                          book.book_key
+                        }</span>
+                    </div>
+                    <div class="book-actions">
+                        <button class="btn-edit" onclick="editBook(${
+                          book.id
+                        })">✏️ Sửa</button>
+                        <button class="btn-delete" onclick="deleteBook(${
+                          book.id
+                        }, '${book.title}')">🗑️ Xóa</button>
+                    </div>
+                </div>
+            `
+          )
+          .join("");
+      }
+
+      function openAddModal() {
+        currentEditId = null;
+        document.getElementById("modalTitle").textContent = "Thêm sách mới";
+        document.getElementById("bookForm").reset();
+        document.getElementById("bookKey").readOnly = false;
+        document.getElementById("bookModal").classList.add("active");
+      }
+
+      async function editBook(id) {
+        const data = await apiCall("/api/admin/books");
+        if (!data || data.status !== "success") return;
+
+        const book = data.data.find((b) => b.id === id);
+        if (!book) return;
+
+        currentEditId = id;
+        document.getElementById("modalTitle").textContent = "Chỉnh sửa sách";
+        document.getElementById("bookId").value = book.id;
+        document.getElementById("bookKey").value = book.book_key;
+        document.getElementById("bookKey").readOnly = true;
+        document.getElementById("title").value = book.title;
+        document.getElementById("author").value = book.author || "";
+        document.getElementById("coverUrl").value = book.cover_url || "";
+        document.getElementById("quantity").value = book.quantity;
+        document.getElementById("bookModal").classList.add("active");
+      }
+
+      async function deleteBook(id, title) {
+        if (!confirm(`Bạn có chắc muốn xóa sách "${title}"?`)) return;
+
+        const data = await apiCall(`/api/admin/books/${id}`, {
+          method: "DELETE",
+        });
+        if (data && data.status === "success") {
+          alert("Xóa sách thành công!");
+          loadBooks();
+          loadStatistics();
+        } else {
+          alert(data?.message || "Không thể xóa sách");
+        }
+      }
+
+      function closeModal() {
+        document.getElementById("bookModal").classList.remove("active");
+      }
+
+      document
+        .getElementById("bookForm")
+        .addEventListener("submit", async (e) => {
+          e.preventDefault();
+
+          const bookData = {
+            book_key: document.getElementById("bookKey").value,
+            title: document.getElementById("title").value,
+            author: document.getElementById("author").value,
+            cover_url: document.getElementById("coverUrl").value,
+            quantity: parseInt(document.getElementById("quantity").value),
+          };
+
+          let data;
+          if (currentEditId) {
+            data = await apiCall(`/api/admin/books/${currentEditId}`, {
+              method: "PUT",
+              body: JSON.stringify(bookData),
+            });
+          } else {
+            data = await apiCall("/api/admin/books", {
+              method: "POST",
+              body: JSON.stringify(bookData),
+            });
+          }
+
+          if (data && data.status === "success") {
+            alert(
+              currentEditId
+                ? "Cập nhật sách thành công!"
+                : "Thêm sách thành công!"
+            );
+            closeModal();
+            loadBooks();
+            loadStatistics();
+          } else {
+            alert(data?.message || "Có lỗi xảy ra");
+          }
+        });
+
+      function logout() {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        window.location.href = "login.html";
+      }
+
+      // Khởi tạo
+      if (checkAuth()) {
+        loadStatistics();
+        loadBooks();
+      }
+
+      // Click outside modal to close
+      document.getElementById("bookModal").addEventListener("click", (e) => {
+        if (e.target.id === "bookModal") {
+          closeModal();
+        }
+      });
+    </script>
+  </body>
+</html>

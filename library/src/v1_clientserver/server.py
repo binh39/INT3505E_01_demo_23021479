@@ -34,7 +34,7 @@ def home():
 # ---------------------------
 # API: Mượn sách
 # ---------------------------
-@app.route("/api/books", methods=["POST"])
+@app.route("/api/v1/books", methods=["POST"])
 def borrow_book():
     data = request.get_json()
     book_key = data.get("book_key")
@@ -69,7 +69,7 @@ def borrow_book():
 # ---------------------------
 # API: Lấy danh sách đã mượn
 # ---------------------------
-@app.route("/api/books", methods=["GET"])
+@app.route("/api/v1/books", methods=["GET"])
 def get_books():
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
@@ -86,7 +86,7 @@ def get_books():
 # ---------------------------
 # API: Trả sách
 # ---------------------------
-@app.route("/api/books/<book_key>", methods=["DELETE"])
+@app.route("/api/v1/books/<book_key>", methods=["DELETE"])
 def return_book(book_key):
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()

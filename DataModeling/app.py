@@ -6,6 +6,7 @@ app = Flask(__name__)
 
 books = [
     {"id": 1, "title": "Clean Code", "author": "Robert C. Martin", "genre": "Software Engineering"},
+    {"id": 7, "title": "Clean Code", "author": "Robert C. Martin", "genre": "Software Engineering"},
     {"id": 2, "title": "Harry Potter", "author": "J.K. Rowling", "genre": "Fantasy"},
     {"id": 3, "title": "The Pragmatic Programmer", "author": "Andrew Hunt", "genre": "Programming"},
     {"id": 4, "title": "Deep Work", "author": "Cal Newport", "genre": "Productivity"},

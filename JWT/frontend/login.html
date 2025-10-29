@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Đăng nhập - Library System</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+      }
+
+      .login-container {
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        overflow: hidden;
+        width: 100%;
+        max-width: 400px;
+      }
+
+      .login-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 40px 30px;
+        text-align: center;
+        color: white;
+      }
+
+      .login-header h1 {
+        font-size: 28px;
+        margin-bottom: 10px;
+      }
+
+      .login-header p {
+        font-size: 14px;
+        opacity: 0.9;
+      }
+
+      .login-form {
+        padding: 40px 30px;
+      }
+
+      .form-group {
+        margin-bottom: 25px;
+      }
+
+      .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        color: #333;
+        font-weight: 500;
+        font-size: 14px;
+      }
+
+      .form-group input {
+        width: 100%;
+        padding: 12px 15px;
+        border: 2px solid #e0e0e0;
+        border-radius: 10px;
+        font-size: 15px;
+        transition: all 0.3s;
+      }
+
+      .form-group input:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+      }
+
+      .btn-login {
+        width: 100%;
+        padding: 14px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        border-radius: 10px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.2s, box-shadow 0.2s;
+      }
+
+      .btn-login:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+      }
+
+      .btn-login:active {
+        transform: translateY(0);
+      }
+
+      .btn-login:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .error-message {
+        background: #fee;
+        color: #c33;
+        padding: 12px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        font-size: 14px;
+        display: none;
+      }
+
+      .demo-accounts {
+        margin-top: 30px;
+        padding-top: 20px;
+        border-top: 1px solid #e0e0e0;
+      }
+
+      .demo-accounts h3 {
+        font-size: 14px;
+        color: #666;
+        margin-bottom: 15px;
+        text-align: center;
+      }
+
+      .demo-account {
+        background: #f8f9fa;
+        padding: 12px;
+        border-radius: 8px;
+        margin-bottom: 10px;
+        font-size: 13px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .demo-account strong {
+        color: #667eea;
+      }
+
+      .demo-account button {
+        background: #667eea;
+        color: white;
+        border: none;
+        padding: 6px 12px;
+        border-radius: 5px;
+        font-size: 12px;
+        cursor: pointer;
+        transition: background 0.3s;
+      }
+
+      .demo-account button:hover {
+        background: #5568d3;
+      }
+
+      .loading {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top-color: white;
+        animation: spin 1s ease-in-out infinite;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="login-container">
+      <div class="login-header">
+        <h1>Library System</h1>
+        <p>Đăng nhập để tiếp tục</p>
+      </div>
+
+      <div class="login-form">
+        <div id="errorMessage" class="error-message"></div>
+
+        <form id="loginForm">
+          <div class="form-group">
+            <label for="username">Tên đăng nhập</label>
+            <input
+              type="text"
+              id="username"
+              name="username"
+              required
+              autocomplete="username"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="password">Mật khẩu</label>
+            <input
+              type="password"
+              id="password"
+              name="password"
+              required
+              autocomplete="current-password"
+            />
+          </div>
+
+          <button type="submit" class="btn-login" id="loginBtn">
+            Đăng nhập
+          </button>
+        </form>
+
+        <div class="demo-accounts">
+          <h3>Tài khoản demo</h3>
+          <div class="demo-account">
+            <div><strong>Admin:</strong> admin / admin123</div>
+            <button onclick="fillLogin('admin', 'admin123')">Dùng</button>
+          </div>
+          <div class="demo-account">
+            <div><strong>User:</strong> user / user123</div>
+            <button onclick="fillLogin('user', 'user123')">Dùng</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const API_URL = "http://localhost:5000";
+
+      function fillLogin(username, password) {
+        document.getElementById("username").value = username;
+        document.getElementById("password").value = password;
+      }
+
+      function showError(message) {
+        const errorDiv = document.getElementById("errorMessage");
+        errorDiv.textContent = message;
+        errorDiv.style.display = "block";
+        setTimeout(() => {
+          errorDiv.style.display = "none";
+        }, 5000);
+      }
+
+      document
+        .getElementById("loginForm")
+        .addEventListener("submit", async (e) => {
+          e.preventDefault();
+
+          const loginBtn = document.getElementById("loginBtn");
+          const username = document.getElementById("username").value;
+          const password = document.getElementById("password").value;
+
+          // Disable button và hiển thị loading
+          loginBtn.disabled = true;
+          loginBtn.innerHTML = '<span class="loading"></span>';
+
+          try {
+            const response = await fetch(`${API_URL}/api/auth/login`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ username, password }),
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+              // Lưu token và thông tin user
+              localStorage.setItem("token", data.data.token);
+              localStorage.setItem("user", JSON.stringify(data.data.user));
+
+              // Chuyển hướng theo role
+              if (data.data.user.role === "admin") {
+                window.location.href = "admin.html";
+              } else {
+                window.location.href = "user.html";
+              }
+            } else {
+              showError(data.message || "Đăng nhập thất bại");
+              loginBtn.disabled = false;
+              loginBtn.textContent = "Đăng nhập";
+            }
+          } catch (error) {
+            console.error("Login error:", error);
+            showError(
+              "Không thể kết nối đến server. Vui lòng kiểm tra server đã chạy chưa."
+            );
+            loginBtn.disabled = false;
+            loginBtn.textContent = "Đăng nhập";
+          }
+        });
+
+      // Kiểm tra nếu đã đăng nhập
+      window.addEventListener("DOMContentLoaded", () => {
+        const token = localStorage.getItem("token");
+        const user = localStorage.getItem("user");
+
+        if (token && user) {
+          const userData = JSON.parse(user);
+          if (userData.role === "admin") {
+            window.location.href = "admin.html";
+          } else {
+            window.location.href = "user.html";
+          }
+        }
+      });
+    </script>
+  </body>
+</html>

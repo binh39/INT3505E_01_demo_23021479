@@ -1,0 +1,35 @@
+@startuml
+title Library Management System - ER Diagram Alt D
+
+entity "books" as books {
+  * id : INTEGER <<PK>>
+  --
+  title : TEXT
+  author : TEXT
+  genre : TEXT
+  created_at : DATETIME
+}
+
+entity "readers" as readers {
+  * id : INTEGER <<PK>>
+  --
+  name : TEXT
+  email : TEXT <<UNIQUE>>
+  created_at : DATETIME
+}
+
+entity "loans" as loans {
+  * id : INTEGER <<PK>>
+  --
+  book_id : INTEGER <<FK>>
+  reader_id : INTEGER <<FK>>
+  borrow_date : DATE
+  due_date : DATE
+  returned : BOOLEAN
+}
+
+books ||--o{ loans : "1-to-many\n(books.id → loans.book_id)"
+readers ||--o{ loans : "1-to-many\n(readers.id → loans.reader_id)"
+
+@enduml
+

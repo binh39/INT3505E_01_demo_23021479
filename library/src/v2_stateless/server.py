@@ -8,17 +8,6 @@ CORS(app)
 DB_NAME = "books.db"
 API_TOKEN = "demo123"  # Token tĩnh để minh họa stateless
 
-# ---------------------------
-# Hàm tiện ích
-# ---------------------------
-def check_auth():
-    """Kiểm tra token trong header."""
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
-        return False
-    token = auth_header.split(" ")[1]
-    return token == API_TOKEN
-
 def init_db():
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
@@ -43,6 +32,14 @@ def home():
 # ---------------------------
 # Middleware kiểm tra token
 # ---------------------------
+def check_auth():
+    """Kiểm tra token trong header."""
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return False
+    token = auth_header.split(" ")[1]
+    return token == API_TOKEN
+
 @app.before_request
 def require_auth():
     """Tất cả request đều cần xác thực (trừ /)."""
@@ -54,7 +51,7 @@ def require_auth():
 # ---------------------------
 # API: Mượn sách
 # ---------------------------
-@app.route("/api/books", methods=["POST"])
+@app.route("/api/v2/books", methods=["POST"])
 def borrow_book():
     data = request.get_json()
     book_key = data.get("book_key")
@@ -86,7 +83,7 @@ def borrow_book():
 # ---------------------------
 # API: Lấy danh sách sách đã mượn
 # ---------------------------
-@app.route("/api/books", methods=["GET"])
+@app.route("/api/v2/books", methods=["GET"])
 def get_books():
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
@@ -103,7 +100,7 @@ def get_books():
 # ---------------------------
 # API: Trả sách
 # ---------------------------
-@app.route("/api/books/<book_key>", methods=["DELETE"])
+@app.route("/api/v2/books/<book_key>", methods=["DELETE"])
 def return_book(book_key):
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
