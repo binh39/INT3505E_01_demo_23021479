@@ -389,13 +389,14 @@
       </div>
     </div>
 
+    <script src="auth.js"></script>
     <script>
       const API_URL = "http://localhost:5000";
-      let token = localStorage.getItem("token");
       let currentEditId = null;
 
       // Kiểm tra đăng nhập và quyền admin
       function checkAuth() {
+        const token = localStorage.getItem("access_token");
         if (!token) {
           window.location.href = "login.html";
           return false;
@@ -413,24 +414,14 @@
       }
 
       async function apiCall(url, options = {}) {
-        const headers = {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-          ...options.headers,
-        };
-
         try {
-          const response = await fetch(`${API_URL}${url}`, {
-            ...options,
-            headers,
-          });
-
+          const response = await Auth.fetchWithAuth(url, options);
+          if (!response) return null;
           if (response.status === 401) {
             alert("Phiên đăng nhập hết hạn");
-            logout();
+            await Auth.logout();
             return null;
           }
-
           return await response.json();
         } catch (error) {
           console.error("API Error:", error);
@@ -440,21 +431,21 @@
       }
 
       async function loadStatistics() {
-        const data = await apiCall("/api/admin/statistics");
+        const data = await apiCall("/api/statistics");
         if (data && data.status === "success") {
           document.getElementById("totalBooks").textContent =
-            data.data.total_books;
+            data.data.library.total_unique_books;
           document.getElementById("totalCopies").textContent =
-            data.data.total_copies;
+            data.data.library.total_copies;
           document.getElementById("borrowedCount").textContent =
-            data.data.borrowed_count;
+            data.data.library.total_borrowed;
           document.getElementById("userCount").textContent =
-            data.data.user_count;
+            data.data.users.total_users;
         }
       }
 
       async function loadBooks() {
-        const data = await apiCall("/api/admin/books");
+        const data = await apiCall("/api/books");
         const container = document.getElementById("booksContainer");
 
         if (!data || data.status !== "success") {
@@ -511,7 +502,7 @@
       }
 
       async function editBook(id) {
-        const data = await apiCall("/api/admin/books");
+        const data = await apiCall("/api/books");
         if (!data || data.status !== "success") return;
 
         const book = data.data.find((b) => b.id === id);
@@ -532,7 +523,7 @@
       async function deleteBook(id, title) {
         if (!confirm(`Bạn có chắc muốn xóa sách "${title}"?`)) return;
 
-        const data = await apiCall(`/api/admin/books/${id}`, {
+        const data = await apiCall(`/api/books/${id}`, {
           method: "DELETE",
         });
         if (data && data.status === "success") {
@@ -563,12 +554,12 @@
 
           let data;
           if (currentEditId) {
-            data = await apiCall(`/api/admin/books/${currentEditId}`, {
+            data = await apiCall(`/api/books/${currentEditId}`, {
               method: "PUT",
               body: JSON.stringify(bookData),
             });
           } else {
-            data = await apiCall("/api/admin/books", {
+            data = await apiCall("/api/books", {
               method: "POST",
               body: JSON.stringify(bookData),
             });
@@ -588,11 +579,7 @@
           }
         });
 
-      function logout() {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-        window.location.href = "login.html";
-      }
+      // logout is provided by auth.js and bound globally already
 
       // Khởi tạo
       if (checkAuth()) {

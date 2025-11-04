@@ -1,0 +1,1808 @@
+openapi: 3.0.3
+info:
+  title: Product Management System API
+  description: |
+    RESTful API for Product Management with JWT Authentication and HATEOAS principles
+    1. Login: POST /api/sessions → Nhận access_token (5 phút) và refresh_token (1 giờ)
+    2. Sử dụng API: Gửi `Authorization: Bearer {access_token}` trong header
+    3. Refresh: POST /api/sessions/refresh khi access_token hết hạn
+    4. Logout: DELETE /api/sessions → Blacklist access token và revoke refresh token
+    - admin: Full access (CRUD products, statistics, manage inventory)
+    - user: View products only
+    Demo Accounts
+    - Admin: `admin` / `admin123`
+    - User: `user` / `user123`
+  contact:
+    name: Product API Support
+    email: support@product.com
+  version: 1.0.0
+servers:
+  - url: http://localhost:5000
+    description: Development server
+tags:
+  - name: Authentication
+    description: "Login, logout, token management (access & refresh tokens)"
+  - name: AdminProducts
+    description: Admin endpoints for managing products (CRUD operations)
+  - name: AdminStatistics
+    description: Admin endpoints for viewing product and inventory statistics
+  - name: UserProducts
+    description: User endpoints for viewing products
+paths:
+  /:
+    get:
+      tags:
+        - Authentication
+      summary: Root endpoint with API information
+      description: "Returns API version, description and available endpoint links"
+      operationId: root_get
+      responses:
+        "200":
+          description: API information retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/inline_response_200"
+      x-openapi-router-controller: swagger_server.controllers.authentication_controller
+  /api/sessions:
+    post:
+      tags:
+        - Authentication
+      summary: User login
+      description: |
+        Authenticate user and receive access token (5 min) + refresh token (1 hour).
+
+        Scopes assigned by role:
+        - Admin: read:products, write:products, manage:inventory, read:stats
+        - User: read:products
+      operationId: api_sessions_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+        required: true
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          description: Username and password are required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                status: error
+                message: Username and password are required
+                meta:
+                  required_fields:
+                    - username
+                    - password
+        "401":
+          description: Invalid username or password
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-openapi-router-controller: swagger_server.controllers.authentication_controller
+    delete:
+      tags:
+        - Authentication
+      summary: Logout
+      description: |
+        Logout user by:
+        1. Blacklisting current access token (until expiry)
+        2. Revoking refresh token (if provided)
+      operationId: api_sessions_delete
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LogoutRequest"
+      responses:
+        "200":
+          description: Logged out successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/inline_response_200_1"
+        "401":
+          description: Token is missing or invalid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      security:
+        - BearerAuth: []
+      x-openapi-router-controller: swagger_server.controllers.authentication_controller
+  /api/sessions/refresh:
+    post:
+      tags:
+        - Authentication
+      summary: Refresh access token
+      description: |
+        Get a new access token using valid refresh token.
+        Refresh token is NOT rotated (reuse same refresh token).
+      operationId: api_sessions_refresh_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshRequest"
+        required: true
+      responses:
+        "200":
+          description: Access token refreshed successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RefreshResponse"
+        "400":
+          description: refresh_token is required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Invalid or expired refresh token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-openapi-router-controller: swagger_server.controllers.authentication_controller
+  /api/sessions/me:
+    get:
+      tags:
+        - Authentication
+      summary: Verify token and get user info
+      description: Verify current access token is valid and get user information
+      operationId: api_sessions_me_get
+      responses:
+        "200":
+          description: Token is valid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/inline_response_200_2"
+        "401":
+          description: Token is invalid or expired
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      security:
+        - BearerAuth: []
+      x-openapi-router-controller: swagger_server.controllers.authentication_controller
+  /api/products:
+    get:
+      tags:
+        - UserProducts
+        - AdminProducts
+      summary: Get all products (with pagination and filtering)
+      description: |
+        Retrieve all products with pagination and filtering support.
+        Available to authenticated users (admin and user).
+      operationId: api_products_get
+      parameters:
+        - name: page
+          in: query
+          description: Page number
+          required: false
+          style: form
+          explode: true
+          schema:
+            minimum: 1
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          description: Items per page
+          required: false
+          style: form
+          explode: true
+          schema:
+            maximum: 100
+            minimum: 1
+            type: integer
+            default: 20
+        - name: category
+          in: query
+          description: Filter by category
+          required: false
+          style: form
+          explode: true
+          schema:
+            type: string
+        - name: brand
+          in: query
+          description: Filter by brand
+          required: false
+          style: form
+          explode: true
+          schema:
+            type: string
+        - name: sku
+          in: query
+          description: Filter by product SKU
+          required: false
+          style: form
+          explode: true
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Filter by status
+          required: false
+          style: form
+          explode: true
+          schema:
+            type: string
+            enum:
+              - active
+              - inactive
+              - discontinued
+        - name: min_price
+          in: query
+          description: Minimum price filter
+          required: false
+          style: form
+          explode: true
+          schema:
+            minimum: 0
+            type: number
+            format: float
+        - name: max_price
+          in: query
+          description: Maximum price filter
+          required: false
+          style: form
+          explode: true
+          schema:
+            type: number
+            format: float
+        - name: search
+          in: query
+          description: Search in product name and description
+          required: false
+          style: form
+          explode: true
+          schema:
+            type: string
+        - name: sort
+          in: query
+          description: Sort order
+          required: false
+          style: form
+          explode: true
+          schema:
+            type: string
+            default: created_at
+            enum:
+              - name
+              - price_asc
+              - price_desc
+              - created_at
+              - updated_at
+      responses:
+        "200":
+          description: Products retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductsListResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      security:
+        - BearerAuth: []
+      x-openapi-router-controller: swagger_server.controllers.user_products_controller
+    post:
+      tags:
+        - AdminProducts
+      summary: Create new product (Admin only)
+      description: Add a new product to inventory. Admin access required.
+      operationId: api_products_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProductRequest"
+        required: true
+      responses:
+        "201":
+          description: Product created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/inline_response_201"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                status: error
+                message: "sku, name, category, and price are required"
+                meta:
+                  required_fields:
+                    - sku
+                    - name
+                    - category
+                    - price
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Product with this SKU already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      security:
+        - BearerAuth: []
+      x-openapi-router-controller: swagger_server.controllers.admin_products_controller
+  /api/products/{product_id}:
+    get:
+      tags:
+        - UserProducts
+        - AdminProducts
+      summary: Get product details by ID
+      description: Retrieve detailed information about a specific product
+      operationId: api_products_product_id_get
+      parameters:
+        - name: product_id
+          in: path
+          description: Product ID
+          required: true
+          style: simple
+          explode: false
+          schema:
+            type: string
+            pattern: "^[a-fA-F0-9]{24}$"
+      responses:
+        "200":
+          description: Product details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/inline_response_200_3"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      security:
+        - BearerAuth: []
+      x-openapi-router-controller: swagger_server.controllers.user_products_controller
+    put:
+      tags:
+        - AdminProducts
+      summary: Update product information (Admin only)
+      description: Update product details. Admin access required.
+      operationId: api_products_product_id_put
+      parameters:
+        - name: product_id
+          in: path
+          description: Product ID
+          required: true
+          style: simple
+          explode: false
+          schema:
+            type: string
+            pattern: "^[a-fA-F0-9]{24}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProductRequest"
+        required: true
+      responses:
+        "200":
+          description: Product updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/inline_response_200_4"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      security:
+        - BearerAuth: []
+      x-openapi-router-controller: swagger_server.controllers.admin_products_controller
+    delete:
+      tags:
+        - AdminProducts
+      summary: Delete product (Admin only)
+      description: |
+        Delete a product from inventory. Admin access required.
+        This is a soft delete - product status will be set to 'discontinued'.
+      operationId: api_products_product_id_delete
+      parameters:
+        - name: product_id
+          in: path
+          description: Product ID
+          required: true
+          style: simple
+          explode: false
+          schema:
+            type: string
+            pattern: "^[a-fA-F0-9]{24}$"
+      responses:
+        "200":
+          description: Product deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/inline_response_200_5"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      security:
+        - BearerAuth: []
+      x-openapi-router-controller: swagger_server.controllers.admin_products_controller
+  /api/categories:
+    get:
+      tags:
+        - UserProducts
+        - AdminProducts
+      summary: Get all product categories
+      description: Retrieve list of all unique product categories
+      operationId: api_categories_get
+      responses:
+        "200":
+          description: Categories retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/inline_response_200_6"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      security:
+        - BearerAuth: []
+      x-openapi-router-controller: swagger_server.controllers.user_products_controller
+  /api/statistics:
+    get:
+      tags:
+        - AdminStatistics
+      summary: Get product and inventory statistics (Admin only)
+      description: |
+        Retrieve comprehensive statistics including:
+        - Inventory metrics (total products, quantities, values)
+        - Category breakdown
+        - Stock status (out of stock, low stock)
+        - Top 10 highest value products
+      operationId: api_statistics_get
+      responses:
+        "200":
+          description: Statistics retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Statistics"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      security:
+        - BearerAuth: []
+      x-openapi-router-controller: swagger_server.controllers.admin_statistics_controller
+components:
+  schemas:
+    Error:
+      required:
+        - message
+        - status
+      type: object
+      properties:
+        status:
+          type: string
+          example: error
+          enum:
+            - error
+        message:
+          type: string
+          example: Invalid credentials
+        data:
+          type: object
+          nullable: true
+        links:
+          type: object
+          nullable: true
+        meta:
+          type: object
+          nullable: true
+    LoginRequest:
+      required:
+        - password
+        - username
+      type: object
+      properties:
+        username:
+          minLength: 1
+          type: string
+          example: admin
+        password:
+          minLength: 1
+          type: string
+          example: admin123
+    LoginResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - success
+        message:
+          type: string
+          example: Login successful
+        data:
+          $ref: "#/components/schemas/LoginResponse_data"
+        links:
+          $ref: "#/components/schemas/LoginResponse_links"
+        meta:
+          $ref: "#/components/schemas/LoginResponse_meta"
+      example:
+        data:
+          access_token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+          refresh_token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+          role: admin
+          id: 1
+          username: admin
+        meta:
+          refresh_token_expires_in: 3600
+          access_token_expires_in: 300
+          timestamp: 2025-11-04T10:30:00Z
+        links:
+          logout: null
+          self:
+            method: GET
+            href: /api/products
+          verify: null
+          refresh: null
+          products: null
+          statistics: null
+        message: Login successful
+        status: success
+    RefreshRequest:
+      required:
+        - refresh_token
+      type: object
+      properties:
+        refresh_token:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+    RefreshResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - success
+        message:
+          type: string
+          example: Access token refreshed
+        data:
+          $ref: "#/components/schemas/RefreshResponse_data"
+        links:
+          type: object
+        meta:
+          $ref: "#/components/schemas/RefreshResponse_meta"
+      example:
+        data:
+          access_token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        meta:
+          access_token_expires_in: 300
+          timestamp: 2000-01-23T04:56:07.000+00:00
+        links: {}
+        message: Access token refreshed
+        status: success
+    LogoutRequest:
+      type: object
+      properties:
+        refresh_token:
+          type: string
+          description: Optional refresh token to revoke
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+    UserInfo:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        username:
+          type: string
+          example: admin
+        role:
+          type: string
+          example: admin
+          enum:
+            - admin
+            - user
+      example:
+        role: admin
+        id: 1
+        username: admin
+    Link:
+      type: object
+      properties:
+        href:
+          type: string
+          example: /api/products
+        method:
+          type: string
+          example: GET
+          enum:
+            - GET
+            - POST
+            - PUT
+            - DELETE
+            - PATCH
+      example:
+        method: GET
+        href: /api/products
+    Product:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique product identifier (MongoDB ObjectId)
+          pattern: "^[a-fA-F0-9]{24}$"
+          example: 64b8f2d0a1b2c3d4e5f60789
+        sku:
+          type: string
+          description: Stock Keeping Unit - unique product code
+          example: PROD-12345
+        name:
+          type: string
+          description: Product name
+          example: Samsung Galaxy S24
+        description:
+          type: string
+          description: Product description
+          nullable: true
+          example: Latest flagship smartphone with advanced camera system
+        category:
+          type: string
+          description: Product category
+          example: Electronics
+        brand:
+          type: string
+          description: Product brand/manufacturer
+          nullable: true
+          example: Samsung
+        price:
+          type: number
+          description: Product price in USD
+          format: float
+          example: 999.99
+        currency:
+          type: string
+          description: Currency code
+          example: USD
+          default: USD
+        quantity:
+          minimum: 0
+          type: integer
+          description: Available quantity in stock
+          example: 50
+        image_url:
+          type: string
+          description: Product image URL
+          nullable: true
+          example: https://example.com/images/samsung-s24.jpg
+        status:
+          type: string
+          description: Product status
+          example: active
+          enum:
+            - active
+            - inactive
+            - discontinued
+        created_at:
+          type: string
+          description: Product creation timestamp
+          format: date-time
+          example: 2025-11-01T08:00:00Z
+        updated_at:
+          type: string
+          description: Last update timestamp
+          format: date-time
+          example: 2025-11-04T10:30:00Z
+        links:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/Link"
+          description: HATEOAS links for related actions
+      example:
+        quantity: 50
+        image_url: https://example.com/images/samsung-s24.jpg
+        description: Latest flagship smartphone with advanced camera system
+        created_at: 2025-11-01T08:00:00Z
+        updated_at: 2025-11-04T10:30:00Z
+        price: 999.99
+        name: Samsung Galaxy S24
+        currency: USD
+        links:
+          key:
+            method: GET
+            href: /api/products
+        id: 1
+        sku: PROD-12345
+        category: Electronics
+        brand: Samsung
+        status: active
+    CreateProductRequest:
+      required:
+        - category
+        - name
+        - price
+        - sku
+      type: object
+      properties:
+        sku:
+          minLength: 1
+          type: string
+          description: Unique Stock Keeping Unit
+          example: PROD-12345
+        name:
+          minLength: 1
+          type: string
+          description: Product name
+          example: Samsung Galaxy S24
+        description:
+          type: string
+          description: Product description
+          example: Latest flagship smartphone with advanced camera system
+        category:
+          minLength: 1
+          type: string
+          description: Product category
+          example: Electronics
+        brand:
+          type: string
+          description: Product brand
+          example: Samsung
+        price:
+          minimum: 0
+          type: number
+          description: Product price
+          format: float
+          example: 999.99
+        currency:
+          type: string
+          description: Currency code
+          example: USD
+          default: USD
+        quantity:
+          minimum: 0
+          type: integer
+          description: Initial stock quantity
+          example: 50
+          default: 0
+        image_url:
+          type: string
+          description: Product image URL
+          example: https://example.com/images/samsung-s24.jpg
+        status:
+          type: string
+          description: Product status
+          default: active
+          enum:
+            - active
+            - inactive
+            - discontinued
+    UpdateProductRequest:
+      type: object
+      properties:
+        name:
+          minLength: 1
+          type: string
+          description: Product name
+          example: Samsung Galaxy S24 Ultra
+        description:
+          type: string
+          description: Product description
+          example: Premium flagship smartphone
+        category:
+          type: string
+          description: Product category
+          example: Electronics
+        brand:
+          type: string
+          description: Product brand
+          example: Samsung
+        price:
+          minimum: 0
+          type: number
+          description: Product price
+          format: float
+          example: 1199.99
+        currency:
+          type: string
+          description: Currency code
+          example: USD
+        quantity:
+          minimum: 0
+          type: integer
+          description: Stock quantity
+          example: 100
+        image_url:
+          type: string
+          description: Product image URL
+          example: https://example.com/images/samsung-s24-ultra.jpg
+        status:
+          type: string
+          description: Product status
+          enum:
+            - active
+            - inactive
+            - discontinued
+    UpdateQuantityRequest:
+      required:
+        - quantity
+      type: object
+      properties:
+        quantity:
+          minimum: 0
+          type: integer
+          description: New stock quantity
+          example: 75
+        operation:
+          type: string
+          description: |
+            Operation type:
+            - set: Set quantity to exact value
+            - add: Add to current quantity
+            - subtract: Subtract from current quantity
+          default: set
+          enum:
+            - set
+            - add
+            - subtract
+    ProductsListResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - success
+        message:
+          type: string
+          example: Retrieved all products successfully
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Product"
+        links:
+          $ref: "#/components/schemas/ProductsListResponse_links"
+        meta:
+          $ref: "#/components/schemas/ProductsListResponse_meta"
+      example:
+        data:
+          - quantity: 50
+            image_url: https://example.com/images/samsung-s24.jpg
+            description: Latest flagship smartphone with advanced camera system
+            created_at: 2025-11-01T08:00:00Z
+            updated_at: 2025-11-04T10:30:00Z
+            price: 999.99
+            name: Samsung Galaxy S24
+            currency: USD
+            links:
+              key:
+                method: GET
+                href: /api/products
+            id: 1
+            sku: PROD-12345
+            category: Electronics
+            brand: Samsung
+            status: active
+          - quantity: 50
+            image_url: https://example.com/images/samsung-s24.jpg
+            description: Latest flagship smartphone with advanced camera system
+            created_at: 2025-11-01T08:00:00Z
+            updated_at: 2025-11-04T10:30:00Z
+            price: 999.99
+            name: Samsung Galaxy S24
+            currency: USD
+            links:
+              key:
+                method: GET
+                href: /api/products
+            id: 1
+            sku: PROD-12345
+            category: Electronics
+            brand: Samsung
+            status: active
+        meta:
+          total_count: 150
+          limit: 20
+          page: 1
+          total_pages: 8
+          timestamp: 2000-01-23T04:56:07.000+00:00
+        links:
+          next: null
+          last: null
+          prev: null
+          self: null
+          create: null
+          first: null
+        message: Retrieved all products successfully
+        status: success
+    Statistics:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - success
+        message:
+          type: string
+          example: Statistics retrieved successfully
+        data:
+          $ref: "#/components/schemas/Statistics_data"
+        links:
+          type: object
+        meta:
+          $ref: "#/components/schemas/Statistics_meta"
+      example:
+        data:
+          top_products:
+            - total_value: 49999.5
+              quantity: 50
+              price: 999.99
+              name: Samsung Galaxy S24
+              id: 1
+              sku: PROD-12345
+            - total_value: 49999.5
+              quantity: 50
+              price: 999.99
+              name: Samsung Galaxy S24
+              id: 1
+              sku: PROD-12345
+          categories:
+            total_categories: 8
+            category_breakdown:
+              - total_value: 125000.0
+                count: 45
+                category: Electronics
+              - total_value: 125000.0
+                count: 45
+                category: Electronics
+          inventory:
+            total_value: 250000.5
+            out_of_stock: 10
+            discontinued_products: 5
+            active_products: 120
+            low_stock: 15
+            total_quantity: 5000
+            inactive_products: 25
+            total_products: 150
+        meta:
+          requested_by: admin
+          timestamp: 2000-01-23T04:56:07.000+00:00
+        links: {}
+        message: Statistics retrieved successfully
+        status: success
+    inline_response_200:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        message:
+          type: string
+          example: Product Management System with JWT Authentication
+        data:
+          $ref: "#/components/schemas/inline_response_200_data"
+        links:
+          $ref: "#/components/schemas/inline_response_200_links"
+        meta:
+          $ref: "#/components/schemas/inline_response_200_meta"
+      example:
+        data:
+          description: RESTful API with JWT and HATEOAS
+          version: "1.0"
+        meta:
+          timestamp: 2000-01-23T04:56:07.000+00:00
+        links:
+          self:
+            method: GET
+            href: /api/products
+          login: null
+          products: null
+        message: Product Management System with JWT Authentication
+        status: success
+    inline_response_200_1:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        message:
+          type: string
+          example: Logged out successfully
+        links:
+          type: object
+        meta:
+          type: object
+      example:
+        meta: {}
+        links: {}
+        message: Logged out successfully
+        status: success
+    inline_response_200_2:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        message:
+          type: string
+          example: Token is valid
+        data:
+          $ref: "#/components/schemas/UserInfo"
+        links:
+          type: object
+        meta:
+          $ref: "#/components/schemas/inline_response_200_2_meta"
+      example:
+        data:
+          role: admin
+          id: 1
+          username: admin
+        meta:
+          token_expires_at: 2000-01-23T04:56:07.000+00:00
+          timestamp: 2000-01-23T04:56:07.000+00:00
+        links: {}
+        message: Token is valid
+        status: success
+    inline_response_201:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        message:
+          type: string
+          example: Product created successfully
+        data:
+          $ref: "#/components/schemas/Product"
+        links:
+          $ref: "#/components/schemas/inline_response_201_links"
+        meta:
+          $ref: "#/components/schemas/inline_response_201_meta"
+      example:
+        data:
+          quantity: 50
+          image_url: https://example.com/images/samsung-s24.jpg
+          description: Latest flagship smartphone with advanced camera system
+          created_at: 2025-11-01T08:00:00Z
+          updated_at: 2025-11-04T10:30:00Z
+          price: 999.99
+          name: Samsung Galaxy S24
+          currency: USD
+          links:
+            key:
+              method: GET
+              href: /api/products
+          id: 1
+          sku: PROD-12345
+          category: Electronics
+          brand: Samsung
+          status: active
+        meta:
+          created_at: 2000-01-23T04:56:07.000+00:00
+          created_by: admin
+        links:
+          all_products: null
+          self:
+            method: GET
+            href: /api/products
+          update: null
+          delete: null
+        message: Product created successfully
+        status: success
+    inline_response_200_3:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        message:
+          type: string
+          example: Product retrieved successfully
+        data:
+          $ref: "#/components/schemas/Product"
+        links:
+          $ref: "#/components/schemas/inline_response_201_links"
+        meta:
+          type: object
+      example:
+        data:
+          quantity: 50
+          image_url: https://example.com/images/samsung-s24.jpg
+          description: Latest flagship smartphone with advanced camera system
+          created_at: 2025-11-01T08:00:00Z
+          updated_at: 2025-11-04T10:30:00Z
+          price: 999.99
+          name: Samsung Galaxy S24
+          currency: USD
+          links:
+            key:
+              method: GET
+              href: /api/products
+          id: 1
+          sku: PROD-12345
+          category: Electronics
+          brand: Samsung
+          status: active
+        meta: {}
+        links:
+          all_products: null
+          self:
+            method: GET
+            href: /api/products
+          update: null
+          delete: null
+        message: Product retrieved successfully
+        status: success
+    inline_response_200_4:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        message:
+          type: string
+          example: Product updated successfully
+        data:
+          $ref: "#/components/schemas/Product"
+        links:
+          $ref: "#/components/schemas/inline_response_200_4_links"
+        meta:
+          $ref: "#/components/schemas/inline_response_200_4_meta"
+      example:
+        data:
+          quantity: 50
+          image_url: https://example.com/images/samsung-s24.jpg
+          description: Latest flagship smartphone with advanced camera system
+          created_at: 2025-11-01T08:00:00Z
+          updated_at: 2025-11-04T10:30:00Z
+          price: 999.99
+          name: Samsung Galaxy S24
+          currency: USD
+          links:
+            key:
+              method: GET
+              href: /api/products
+          id: 1
+          sku: PROD-12345
+          category: Electronics
+          brand: Samsung
+          status: active
+        meta:
+          updated_at: 2000-01-23T04:56:07.000+00:00
+          updated_by: updated_by
+        links:
+          all_products: null
+          self:
+            method: GET
+            href: /api/products
+          delete: null
+        message: Product updated successfully
+        status: success
+    inline_response_200_5:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        message:
+          type: string
+          example: Product deleted successfully
+        data:
+          $ref: "#/components/schemas/Product"
+        links:
+          $ref: "#/components/schemas/inline_response_200_5_links"
+        meta:
+          $ref: "#/components/schemas/inline_response_200_5_meta"
+      example:
+        data:
+          quantity: 50
+          image_url: https://example.com/images/samsung-s24.jpg
+          description: Latest flagship smartphone with advanced camera system
+          created_at: 2025-11-01T08:00:00Z
+          updated_at: 2025-11-04T10:30:00Z
+          price: 999.99
+          name: Samsung Galaxy S24
+          currency: USD
+          links:
+            key:
+              method: GET
+              href: /api/products
+          id: 1
+          sku: PROD-12345
+          category: Electronics
+          brand: Samsung
+          status: active
+        meta:
+          deleted_by: deleted_by
+          deleted_at: 2000-01-23T04:56:07.000+00:00
+        links:
+          all_products:
+            method: GET
+            href: /api/products
+        message: Product deleted successfully
+        status: success
+    inline_response_200_6:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        message:
+          type: string
+          example: Categories retrieved successfully
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/inline_response_200_6_data"
+        links:
+          type: object
+        meta:
+          $ref: "#/components/schemas/inline_response_200_6_meta"
+      example:
+        data:
+          - count: 45
+            category: Electronics
+          - count: 45
+            category: Electronics
+        meta:
+          total_categories: 8
+          timestamp: 2000-01-23T04:56:07.000+00:00
+        links: {}
+        message: Categories retrieved successfully
+        status: success
+    LoginResponse_data:
+      required:
+        - access_token
+        - id
+        - refresh_token
+        - role
+        - username
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        username:
+          type: string
+          example: admin
+        role:
+          type: string
+          example: admin
+          enum:
+            - admin
+            - user
+        access_token:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        refresh_token:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+      example:
+        access_token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        refresh_token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        role: admin
+        id: 1
+        username: admin
+    LoginResponse_links:
+      type: object
+      properties:
+        self:
+          $ref: "#/components/schemas/Link"
+        verify:
+          $ref: "#/components/schemas/Link"
+        refresh:
+          $ref: "#/components/schemas/Link"
+        logout:
+          $ref: "#/components/schemas/Link"
+        products:
+          $ref: "#/components/schemas/Link"
+        statistics:
+          $ref: "#/components/schemas/Link"
+      example:
+        logout: null
+        self:
+          method: GET
+          href: /api/products
+        verify: null
+        refresh: null
+        products: null
+        statistics: null
+    LoginResponse_meta:
+      type: object
+      properties:
+        access_token_expires_in:
+          type: integer
+          description: Access token lifetime in seconds
+          example: 300
+        refresh_token_expires_in:
+          type: integer
+          description: Refresh token lifetime in seconds
+          example: 3600
+        timestamp:
+          type: string
+          format: date-time
+          example: 2025-11-04T10:30:00Z
+      example:
+        refresh_token_expires_in: 3600
+        access_token_expires_in: 300
+        timestamp: 2025-11-04T10:30:00Z
+    RefreshResponse_data:
+      type: object
+      properties:
+        access_token:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+      example:
+        access_token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+    RefreshResponse_meta:
+      type: object
+      properties:
+        access_token_expires_in:
+          type: integer
+          example: 300
+        timestamp:
+          type: string
+          format: date-time
+      example:
+        access_token_expires_in: 300
+        timestamp: 2000-01-23T04:56:07.000+00:00
+    ProductsListResponse_links:
+      type: object
+      properties:
+        self:
+          $ref: "#/components/schemas/Link"
+        create:
+          $ref: "#/components/schemas/Link"
+        prev:
+          $ref: "#/components/schemas/Link"
+        next:
+          $ref: "#/components/schemas/Link"
+        first:
+          $ref: "#/components/schemas/Link"
+        last:
+          $ref: "#/components/schemas/Link"
+      example:
+        next: null
+        last: null
+        prev: null
+        self: null
+        create: null
+        first: null
+    ProductsListResponse_meta:
+      type: object
+      properties:
+        total_count:
+          type: integer
+          description: Total number of products
+          example: 150
+        page:
+          type: integer
+          description: Current page number
+          example: 1
+        limit:
+          type: integer
+          description: Items per page
+          example: 20
+        total_pages:
+          type: integer
+          description: Total number of pages
+          example: 8
+        timestamp:
+          type: string
+          format: date-time
+      example:
+        total_count: 150
+        limit: 20
+        page: 1
+        total_pages: 8
+        timestamp: 2000-01-23T04:56:07.000+00:00
+    Statistics_data_inventory:
+      type: object
+      properties:
+        total_products:
+          type: integer
+          description: Total number of unique products
+          example: 150
+        total_quantity:
+          type: integer
+          description: Total quantity across all products
+          example: 5000
+        total_value:
+          type: number
+          description: Total inventory value
+          format: float
+          example: 250000.5
+        active_products:
+          type: integer
+          description: Number of active products
+          example: 120
+        inactive_products:
+          type: integer
+          description: Number of inactive products
+          example: 25
+        discontinued_products:
+          type: integer
+          description: Number of discontinued products
+          example: 5
+        out_of_stock:
+          type: integer
+          description: Number of out-of-stock products
+          example: 10
+        low_stock:
+          type: integer
+          description: Number of products with low stock (< 10 units)
+          example: 15
+      example:
+        total_value: 250000.5
+        out_of_stock: 10
+        discontinued_products: 5
+        active_products: 120
+        low_stock: 15
+        total_quantity: 5000
+        inactive_products: 25
+        total_products: 150
+    Statistics_data_categories_category_breakdown:
+      type: object
+      properties:
+        category:
+          type: string
+          example: Electronics
+        count:
+          type: integer
+          example: 45
+        total_value:
+          type: number
+          format: float
+          example: 125000.0
+      example:
+        total_value: 125000.0
+        count: 45
+        category: Electronics
+    Statistics_data_categories:
+      type: object
+      properties:
+        total_categories:
+          type: integer
+          description: Number of unique categories
+          example: 8
+        category_breakdown:
+          type: array
+          items:
+            $ref: "#/components/schemas/Statistics_data_categories_category_breakdown"
+      example:
+        total_categories: 8
+        category_breakdown:
+          - total_value: 125000.0
+            count: 45
+            category: Electronics
+          - total_value: 125000.0
+            count: 45
+            category: Electronics
+    Statistics_data_top_products:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        sku:
+          type: string
+          example: PROD-12345
+        name:
+          type: string
+          example: Samsung Galaxy S24
+        price:
+          type: number
+          format: float
+          example: 999.99
+        quantity:
+          type: integer
+          example: 50
+        total_value:
+          type: number
+          format: float
+          example: 49999.5
+      example:
+        total_value: 49999.5
+        quantity: 50
+        price: 999.99
+        name: Samsung Galaxy S24
+        id: 1
+        sku: PROD-12345
+    Statistics_data:
+      type: object
+      properties:
+        inventory:
+          $ref: "#/components/schemas/Statistics_data_inventory"
+        categories:
+          $ref: "#/components/schemas/Statistics_data_categories"
+        top_products:
+          type: array
+          description: Top 10 highest value products
+          items:
+            $ref: "#/components/schemas/Statistics_data_top_products"
+      example:
+        top_products:
+          - total_value: 49999.5
+            quantity: 50
+            price: 999.99
+            name: Samsung Galaxy S24
+            id: 1
+            sku: PROD-12345
+          - total_value: 49999.5
+            quantity: 50
+            price: 999.99
+            name: Samsung Galaxy S24
+            id: 1
+            sku: PROD-12345
+        categories:
+          total_categories: 8
+          category_breakdown:
+            - total_value: 125000.0
+              count: 45
+              category: Electronics
+            - total_value: 125000.0
+              count: 45
+              category: Electronics
+        inventory:
+          total_value: 250000.5
+          out_of_stock: 10
+          discontinued_products: 5
+          active_products: 120
+          low_stock: 15
+          total_quantity: 5000
+          inactive_products: 25
+          total_products: 150
+    Statistics_meta:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        requested_by:
+          type: string
+          example: admin
+      example:
+        requested_by: admin
+        timestamp: 2000-01-23T04:56:07.000+00:00
+    inline_response_200_data:
+      type: object
+      properties:
+        version:
+          type: string
+          example: "1.0"
+        description:
+          type: string
+          example: RESTful API with JWT and HATEOAS
+      example:
+        description: RESTful API with JWT and HATEOAS
+        version: "1.0"
+    inline_response_200_links:
+      type: object
+      properties:
+        self:
+          $ref: "#/components/schemas/Link"
+        login:
+          $ref: "#/components/schemas/Link"
+        products:
+          $ref: "#/components/schemas/Link"
+      example:
+        self:
+          method: GET
+          href: /api/products
+        login: null
+        products: null
+    inline_response_200_meta:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+      example:
+        timestamp: 2000-01-23T04:56:07.000+00:00
+    inline_response_200_2_meta:
+      type: object
+      properties:
+        token_expires_at:
+          type: string
+          format: date-time
+        timestamp:
+          type: string
+          format: date-time
+      example:
+        token_expires_at: 2000-01-23T04:56:07.000+00:00
+        timestamp: 2000-01-23T04:56:07.000+00:00
+    inline_response_201_links:
+      type: object
+      properties:
+        self:
+          $ref: "#/components/schemas/Link"
+        update:
+          $ref: "#/components/schemas/Link"
+        delete:
+          $ref: "#/components/schemas/Link"
+        all_products:
+          $ref: "#/components/schemas/Link"
+      example:
+        all_products: null
+        self:
+          method: GET
+          href: /api/products
+        update: null
+        delete: null
+    inline_response_201_meta:
+      type: object
+      properties:
+        created_at:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+          example: admin
+      example:
+        created_at: 2000-01-23T04:56:07.000+00:00
+        created_by: admin
+    inline_response_200_4_links:
+      type: object
+      properties:
+        self:
+          $ref: "#/components/schemas/Link"
+        delete:
+          $ref: "#/components/schemas/Link"
+        all_products:
+          $ref: "#/components/schemas/Link"
+      example:
+        all_products: null
+        self:
+          method: GET
+          href: /api/products
+        delete: null
+    inline_response_200_4_meta:
+      type: object
+      properties:
+        updated_at:
+          type: string
+          format: date-time
+        updated_by:
+          type: string
+      example:
+        updated_at: 2000-01-23T04:56:07.000+00:00
+        updated_by: updated_by
+    inline_response_200_5_links:
+      type: object
+      properties:
+        all_products:
+          $ref: "#/components/schemas/Link"
+      example:
+        all_products:
+          method: GET
+          href: /api/products
+    inline_response_200_5_meta:
+      type: object
+      properties:
+        deleted_at:
+          type: string
+          format: date-time
+        deleted_by:
+          type: string
+      example:
+        deleted_by: deleted_by
+        deleted_at: 2000-01-23T04:56:07.000+00:00
+    inline_response_200_6_data:
+      type: object
+      properties:
+        category:
+          type: string
+          example: Electronics
+        count:
+          type: integer
+          description: Number of products in this category
+          example: 45
+      example:
+        count: 45
+        category: Electronics
+    inline_response_200_6_meta:
+      type: object
+      properties:
+        total_categories:
+          type: integer
+          example: 8
+        timestamp:
+          type: string
+          format: date-time
+      example:
+        total_categories: 8
+        timestamp: 2000-01-23T04:56:07.000+00:00
+  securitySchemes:
+    BearerAuth:
+      type: http
+      description: |
+        JWT Access Token (expires in 5 minutes).
+        Example: `Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`
+      scheme: bearer
+      bearerFormat: JWT
+      x-bearerInfoFunc: swagger_server.controllers.authorization_controller.check_BearerAuth

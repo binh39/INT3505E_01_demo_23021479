@@ -1,0 +1,1221 @@
+openapi: 3.0.3
+info:
+  title: Product Management System API
+  description: |
+    RESTful API for Product Management with JWT Authentication and HATEOAS principles
+    1. Login: POST /api/sessions → Nhận access_token (5 phút) và refresh_token (1 giờ)
+    2. Sử dụng API: Gửi `Authorization: Bearer {access_token}` trong header
+    3. Refresh: POST /api/sessions/refresh khi access_token hết hạn
+    4. Logout: DELETE /api/sessions → Blacklist access token và revoke refresh token
+    - admin: Full access (CRUD products, statistics, manage inventory)
+    - user: View products only
+    Demo Accounts
+    - Admin: `admin` / `admin123`
+    - User: `user` / `user123`
+  version: 1.0.0
+  contact:
+    name: Product API Support
+    email: support@product.com
+servers:
+  - url: http://localhost:5000
+    description: Development server
+
+tags:
+  - name: Authentication
+    description: Login, logout, token management (access & refresh tokens)
+  - name: AdminProducts
+    description: Admin endpoints for managing products (CRUD operations)
+  - name: AdminStatistics
+    description: Admin endpoints for viewing product and inventory statistics
+  - name: UserProducts
+    description: User endpoints for viewing products
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT Access Token (expires in 5 minutes).
+        Example: `Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`
+
+  schemas:
+    Error:
+      type: object
+      required:
+        - status
+        - message
+      properties:
+        status:
+          type: string
+          enum: [error]
+          example: error
+        message:
+          type: string
+          example: Invalid credentials
+        data:
+          type: object
+          nullable: true
+        links:
+          type: object
+          nullable: true
+        meta:
+          type: object
+          nullable: true
+
+    LoginRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          example: admin
+          minLength: 1
+        password:
+          type: string
+          example: admin123
+          minLength: 1
+
+    LoginResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success]
+        message:
+          type: string
+          example: Login successful
+        data:
+          type: object
+          required:
+            - id
+            - username
+            - role
+            - access_token
+            - refresh_token
+          properties:
+            id:
+              type: string
+              example: 1
+            username:
+              type: string
+              example: admin
+            role:
+              type: string
+              enum: [admin, user]
+              example: admin
+            access_token:
+              type: string
+              example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+            refresh_token:
+              type: string
+              example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        links:
+          type: object
+          properties:
+            self:
+              $ref: "#/components/schemas/Link"
+            verify:
+              $ref: "#/components/schemas/Link"
+            refresh:
+              $ref: "#/components/schemas/Link"
+            logout:
+              $ref: "#/components/schemas/Link"
+            products:
+              $ref: "#/components/schemas/Link"
+            statistics:
+              $ref: "#/components/schemas/Link"
+        meta:
+          type: object
+          properties:
+            access_token_expires_in:
+              type: integer
+              example: 300
+              description: Access token lifetime in seconds
+            refresh_token_expires_in:
+              type: integer
+              example: 3600
+              description: Refresh token lifetime in seconds
+            timestamp:
+              type: string
+              format: date-time
+              example: "2025-11-04T10:30:00.000000Z"
+
+    RefreshRequest:
+      type: object
+      required:
+        - refresh_token
+      properties:
+        refresh_token:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+    RefreshResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success]
+        message:
+          type: string
+          example: Access token refreshed
+        data:
+          type: object
+          properties:
+            access_token:
+              type: string
+              example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        links:
+          type: object
+        meta:
+          type: object
+          properties:
+            access_token_expires_in:
+              type: integer
+              example: 300
+            timestamp:
+              type: string
+              format: date-time
+
+    LogoutRequest:
+      type: object
+      properties:
+        refresh_token:
+          type: string
+          description: Optional refresh token to revoke
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+    UserInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "1"
+        username:
+          type: string
+          example: admin
+        role:
+          type: string
+          enum: [admin, user]
+          example: admin
+
+    Link:
+      type: object
+      properties:
+        href:
+          type: string
+          example: /api/products
+        method:
+          type: string
+          enum: [GET, POST, PUT, DELETE, PATCH]
+          example: GET
+
+    Product:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "1"
+          description: Unique product identifier
+        sku:
+          type: string
+          example: PROD-12345
+          description: Stock Keeping Unit - unique product code
+        name:
+          type: string
+          example: Samsung Galaxy S24
+          description: Product name
+        description:
+          type: string
+          example: Latest flagship smartphone with advanced camera system
+          nullable: true
+          description: Product description
+        category:
+          type: string
+          example: Electronics
+          description: Product category
+        brand:
+          type: string
+          example: Samsung
+          nullable: true
+          description: Product brand/manufacturer
+        price:
+          type: number
+          format: float
+          example: 999.99
+          description: Product price in USD
+        currency:
+          type: string
+          example: USD
+          default: USD
+          description: Currency code
+        quantity:
+          type: integer
+          example: 50
+          minimum: 0
+          description: Available quantity in stock
+        image_url:
+          type: string
+          example: https://example.com/images/samsung-s24.jpg
+          nullable: true
+          description: Product image URL
+        status:
+          type: string
+          enum: [active, inactive, discontinued]
+          example: active
+          description: Product status
+        created_at:
+          type: string
+          format: date-time
+          example: "2025-11-01T08:00:00Z"
+          description: Product creation timestamp
+        updated_at:
+          type: string
+          format: date-time
+          example: "2025-11-04T10:30:00Z"
+          description: Last update timestamp
+        links:
+          type: object
+          description: HATEOAS links for related actions
+          additionalProperties:
+            $ref: "#/components/schemas/Link"
+
+    CreateProductRequest:
+      type: object
+      required:
+        - sku
+        - name
+        - category
+        - price
+      properties:
+        sku:
+          type: string
+          example: PROD-12345
+          description: Unique Stock Keeping Unit
+          minLength: 1
+        name:
+          type: string
+          example: Samsung Galaxy S24
+          description: Product name
+          minLength: 1
+        description:
+          type: string
+          example: Latest flagship smartphone with advanced camera system
+          description: Product description
+        category:
+          type: string
+          example: Electronics
+          description: Product category
+          minLength: 1
+        brand:
+          type: string
+          example: Samsung
+          description: Product brand
+        price:
+          type: number
+          format: float
+          example: 999.99
+          minimum: 0
+          description: Product price
+        currency:
+          type: string
+          example: USD
+          default: USD
+          description: Currency code
+        quantity:
+          type: integer
+          example: 50
+          minimum: 0
+          default: 0
+          description: Initial stock quantity
+        image_url:
+          type: string
+          example: https://example.com/images/samsung-s24.jpg
+          description: Product image URL
+        status:
+          type: string
+          enum: [active, inactive, discontinued]
+          default: active
+          description: Product status
+
+    UpdateProductRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          example: Samsung Galaxy S24 Ultra
+          description: Product name
+          minLength: 1
+        description:
+          type: string
+          example: Premium flagship smartphone
+          description: Product description
+        category:
+          type: string
+          example: Electronics
+          description: Product category
+        brand:
+          type: string
+          example: Samsung
+          description: Product brand
+        price:
+          type: number
+          format: float
+          example: 1199.99
+          minimum: 0
+          description: Product price
+        currency:
+          type: string
+          example: USD
+          description: Currency code
+        quantity:
+          type: integer
+          example: 100
+          minimum: 0
+          description: Stock quantity
+        image_url:
+          type: string
+          example: https://example.com/images/samsung-s24-ultra.jpg
+          description: Product image URL
+        status:
+          type: string
+          enum: [active, inactive, discontinued]
+          description: Product status
+
+    UpdateQuantityRequest:
+      type: object
+      required:
+        - quantity
+      properties:
+        quantity:
+          type: integer
+          example: 75
+          minimum: 0
+          description: New stock quantity
+        operation:
+          type: string
+          enum: [set, add, subtract]
+          default: set
+          description: |
+            Operation type:
+            - set: Set quantity to exact value
+            - add: Add to current quantity
+            - subtract: Subtract from current quantity
+
+    ProductsListResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success]
+        message:
+          type: string
+          example: Retrieved all products successfully
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Product"
+        links:
+          type: object
+          properties:
+            self:
+              $ref: "#/components/schemas/Link"
+            create:
+              $ref: "#/components/schemas/Link"
+            prev:
+              $ref: "#/components/schemas/Link"
+            next:
+              $ref: "#/components/schemas/Link"
+            first:
+              $ref: "#/components/schemas/Link"
+            last:
+              $ref: "#/components/schemas/Link"
+        meta:
+          type: object
+          properties:
+            total_count:
+              type: integer
+              example: 150
+              description: Total number of products
+            page:
+              type: integer
+              example: 1
+              description: Current page number
+            limit:
+              type: integer
+              example: 20
+              description: Items per page
+            total_pages:
+              type: integer
+              example: 8
+              description: Total number of pages
+            timestamp:
+              type: string
+              format: date-time
+
+    Statistics:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success]
+        message:
+          type: string
+          example: Statistics retrieved successfully
+        data:
+          type: object
+          properties:
+            inventory:
+              type: object
+              properties:
+                total_products:
+                  type: integer
+                  example: 150
+                  description: Total number of unique products
+                total_quantity:
+                  type: integer
+                  example: 5000
+                  description: Total quantity across all products
+                total_value:
+                  type: number
+                  format: float
+                  example: 250000.50
+                  description: Total inventory value
+                active_products:
+                  type: integer
+                  example: 120
+                  description: Number of active products
+                inactive_products:
+                  type: integer
+                  example: 25
+                  description: Number of inactive products
+                discontinued_products:
+                  type: integer
+                  example: 5
+                  description: Number of discontinued products
+                out_of_stock:
+                  type: integer
+                  example: 10
+                  description: Number of out-of-stock products
+                low_stock:
+                  type: integer
+                  example: 15
+                  description: Number of products with low stock (< 10 units)
+            categories:
+              type: object
+              properties:
+                total_categories:
+                  type: integer
+                  example: 8
+                  description: Number of unique categories
+                category_breakdown:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      category:
+                        type: string
+                        example: Electronics
+                      count:
+                        type: integer
+                        example: 45
+                      total_value:
+                        type: number
+                        format: float
+                        example: 125000.00
+            top_products:
+              type: array
+              description: Top 10 highest value products
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    example: "1"
+                  sku:
+                    type: string
+                    example: PROD-12345
+                  name:
+                    type: string
+                    example: Samsung Galaxy S24
+                  price:
+                    type: number
+                    format: float
+                    example: 999.99
+                  quantity:
+                    type: integer
+                    example: 50
+                  total_value:
+                    type: number
+                    format: float
+                    example: 49999.50
+        links:
+          type: object
+        meta:
+          type: object
+          properties:
+            timestamp:
+              type: string
+              format: date-time
+            requested_by:
+              type: string
+              example: admin
+
+paths:
+  /:
+    get:
+      tags:
+        - Authentication
+      summary: Root endpoint with API information
+      description: Returns API version, description and available endpoint links
+      responses:
+        "200":
+          description: API information retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                    example: Product Management System with JWT Authentication
+                  data:
+                    type: object
+                    properties:
+                      version:
+                        type: string
+                        example: "1.0"
+                      description:
+                        type: string
+                        example: RESTful API with JWT and HATEOAS
+                  links:
+                    type: object
+                    properties:
+                      self:
+                        $ref: "#/components/schemas/Link"
+                      login:
+                        $ref: "#/components/schemas/Link"
+                      products:
+                        $ref: "#/components/schemas/Link"
+                  meta:
+                    type: object
+                    properties:
+                      timestamp:
+                        type: string
+                        format: date-time
+
+  /api/sessions:
+    post:
+      tags:
+        - Authentication
+      summary: User login
+      description: |
+        Authenticate user and receive access token (5 min) + refresh token (1 hour).
+
+        Scopes assigned by role:
+        - Admin: read:products, write:products, manage:inventory, read:stats
+        - User: read:products
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          description: Username and password are required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                status: error
+                message: Username and password are required
+                meta:
+                  required_fields: [username, password]
+        "401":
+          description: Invalid username or password
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      tags:
+        - Authentication
+      summary: Logout
+      description: |
+        Logout user by:
+        1. Blacklisting current access token (until expiry)
+        2. Revoking refresh token (if provided)
+      security:
+        - BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LogoutRequest"
+      responses:
+        "200":
+          description: Logged out successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                    example: Logged out successfully
+                  links:
+                    type: object
+                  meta:
+                    type: object
+        "401":
+          description: Token is missing or invalid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/sessions/refresh:
+    post:
+      tags:
+        - Authentication
+      summary: Refresh access token
+      description: |
+        Get a new access token using valid refresh token.
+        Refresh token is NOT rotated (reuse same refresh token).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshRequest"
+      responses:
+        "200":
+          description: Access token refreshed successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RefreshResponse"
+        "400":
+          description: refresh_token is required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Invalid or expired refresh token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/sessions/me:
+    get:
+      tags:
+        - Authentication
+      summary: Verify token and get user info
+      description: Verify current access token is valid and get user information
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Token is valid
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                    example: Token is valid
+                  data:
+                    $ref: "#/components/schemas/UserInfo"
+                  links:
+                    type: object
+                  meta:
+                    type: object
+                    properties:
+                      token_expires_at:
+                        type: string
+                        format: date-time
+                      timestamp:
+                        type: string
+                        format: date-time
+        "401":
+          description: Token is invalid or expired
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/products:
+    get:
+      tags:
+        - UserProducts
+        - AdminProducts
+      summary: Get all products (with pagination and filtering)
+      description: |
+        Retrieve all products with pagination and filtering support.
+        Available to authenticated users (admin and user).
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+          description: Page number
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+          description: Items per page
+        - name: category
+          in: query
+          schema:
+            type: string
+          description: Filter by category
+        - name: brand
+          in: query
+          schema:
+            type: string
+          description: Filter by brand
+        - name: sku
+          in: query
+          schema:
+            type: string
+          description: Filter by product SKU
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, inactive, discontinued]
+          description: Filter by status
+        - name: min_price
+          in: query
+          schema:
+            type: number
+            format: float
+            minimum: 0
+          description: Minimum price filter
+        - name: max_price
+          in: query
+          schema:
+            type: number
+            format: float
+          description: Maximum price filter
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Search in product name and description
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [name, price_asc, price_desc, created_at, updated_at]
+            default: created_at
+          description: Sort order
+      responses:
+        "200":
+          description: Products retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductsListResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    post:
+      tags:
+        - AdminProducts
+      summary: Create new product (Admin only)
+      description: Add a new product to inventory. Admin access required.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProductRequest"
+      responses:
+        "201":
+          description: Product created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                    example: Product created successfully
+                  data:
+                    $ref: "#/components/schemas/Product"
+                  links:
+                    type: object
+                    properties:
+                      self:
+                        $ref: "#/components/schemas/Link"
+                      update:
+                        $ref: "#/components/schemas/Link"
+                      delete:
+                        $ref: "#/components/schemas/Link"
+                      all_products:
+                        $ref: "#/components/schemas/Link"
+                  meta:
+                    type: object
+                    properties:
+                      created_at:
+                        type: string
+                        format: date-time
+                      created_by:
+                        type: string
+                        example: admin
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                status: error
+                message: sku, name, category, and price are required
+                meta:
+                  required_fields: [sku, name, category, price]
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Product with this SKU already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/products/{product_id}:
+    get:
+      tags:
+        - UserProducts
+        - AdminProducts
+      summary: Get product details by ID
+      description: Retrieve detailed information about a specific product
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: product_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Product ID
+      responses:
+        "200":
+          description: Product details retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                    example: Product retrieved successfully
+                  data:
+                    $ref: "#/components/schemas/Product"
+                  links:
+                    type: object
+                    properties:
+                      self:
+                        $ref: "#/components/schemas/Link"
+                      update:
+                        $ref: "#/components/schemas/Link"
+                      delete:
+                        $ref: "#/components/schemas/Link"
+                      all_products:
+                        $ref: "#/components/schemas/Link"
+                  meta:
+                    type: object
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    put:
+      tags:
+        - AdminProducts
+      summary: Update product information (Admin only)
+      description: Update product details. Admin access required.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: product_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Product ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProductRequest"
+      responses:
+        "200":
+          description: Product updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                    example: Product updated successfully
+                  data:
+                    $ref: "#/components/schemas/Product"
+                  links:
+                    type: object
+                    properties:
+                      self:
+                        $ref: "#/components/schemas/Link"
+                      delete:
+                        $ref: "#/components/schemas/Link"
+                      all_products:
+                        $ref: "#/components/schemas/Link"
+                  meta:
+                    type: object
+                    properties:
+                      updated_at:
+                        type: string
+                        format: date-time
+                      updated_by:
+                        type: string
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      tags:
+        - AdminProducts
+      summary: Delete product (Admin only)
+      description: |
+        Delete a product from inventory. Admin access required.
+        This is a soft delete - product status will be set to 'discontinued'.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: product_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Product ID
+      responses:
+        "200":
+          description: Product deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                    example: Product deleted successfully
+                  data:
+                    $ref: "#/components/schemas/Product"
+                  links:
+                    type: object
+                    properties:
+                      all_products:
+                        $ref: "#/components/schemas/Link"
+                  meta:
+                    type: object
+                    properties:
+                      deleted_at:
+                        type: string
+                        format: date-time
+                      deleted_by:
+                        type: string
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/categories:
+    get:
+      tags:
+        - UserProducts
+        - AdminProducts
+      summary: Get all product categories
+      description: Retrieve list of all unique product categories
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Categories retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                    example: Categories retrieved successfully
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        category:
+                          type: string
+                          example: Electronics
+                        count:
+                          type: integer
+                          example: 45
+                          description: Number of products in this category
+                  links:
+                    type: object
+                  meta:
+                    type: object
+                    properties:
+                      total_categories:
+                        type: integer
+                        example: 8
+                      timestamp:
+                        type: string
+                        format: date-time
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/statistics:
+    get:
+      tags:
+        - AdminStatistics
+      summary: Get product and inventory statistics (Admin only)
+      description: |
+        Retrieve comprehensive statistics including:
+        - Inventory metrics (total products, quantities, values)
+        - Category breakdown
+        - Stock status (out of stock, low stock)
+        - Top 10 highest value products
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Statistics retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Statistics"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"

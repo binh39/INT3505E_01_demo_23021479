@@ -1,0 +1,1190 @@
+openapi: 3.0.3
+info:
+  title: Library Management System API
+  description: |
+    RESTful API với JWT Authentication, HATEOAS principles, Access/Refresh tokens
+
+    ## Authentication Flow
+    1. **Login**: POST /api/sessions → Nhận access_token (5 phút) và refresh_token (1 giờ)
+    2. **Sử dụng API**: Gửi `Authorization: Bearer {access_token}` trong header
+    3. **Refresh**: POST /api/sessions/refresh khi access_token hết hạn
+    4. **Logout**: DELETE /api/sessions → Blacklist access token và revoke refresh token
+
+    ## Roles
+    - **admin**: Full access (CRUD books, statistics, manage users)
+    - **user**: Borrow/return books, view library
+
+    ## Demo Accounts
+    - Admin: `admin` / `admin123`
+    - User: `user` / `user123`
+  version: 2.0.0
+  contact:
+    name: Library API Support
+    email: support@library.com
+servers:
+  - url: http://localhost:5000
+    description: Development server
+
+tags:
+  - name: Authentication
+    description: Login, logout, token management (access & refresh tokens)
+  - name: Admin - Books
+    description: Admin endpoints for managing library books (CRUD)
+  - name: Admin - Statistics
+    description: Admin endpoints for viewing library statistics
+  - name: User - Borrowing
+    description: User endpoints for borrowing and returning books
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT Access Token (expires in 5 minutes)
+
+        Example: `Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`
+
+  schemas:
+    Error:
+      type: object
+      required:
+        - status
+        - message
+      properties:
+        status:
+          type: string
+          enum: [error]
+          example: error
+        message:
+          type: string
+          example: Invalid credentials
+        data:
+          type: object
+          nullable: true
+        links:
+          type: object
+          nullable: true
+        meta:
+          type: object
+          nullable: true
+
+    LoginRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          example: admin
+          minLength: 1
+        password:
+          type: string
+          example: admin123
+          minLength: 1
+
+    LoginResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success]
+        message:
+          type: string
+          example: Login successful
+        data:
+          type: object
+          required:
+            - id
+            - username
+            - role
+            - access_token
+            - refresh_token
+          properties:
+            id:
+              type: integer
+              example: 1
+            username:
+              type: string
+              example: admin
+            role:
+              type: string
+              enum: [admin, user]
+              example: admin
+            access_token:
+              type: string
+              example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxLCJ1c2VybmFtZSI6ImFkbWluIiwicm9sZSI6ImFkbWluIiwic2NvcGVzIjpbInJlYWQ6Ym9va3MiLCJ3cml0ZTpib29rcyIsIm1hbmFnZTp1c2VycyIsInJlYWQ6c3RhdHMiLCJib3Jyb3c6d3JpdGUiXSwianRpIjoiYWJjZDEyMzQiLCJleHAiOjE3MzA3MzQ4MDAsImlhdCI6MTczMDczNDUwMH0...
+            refresh_token:
+              type: string
+              example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxLCJ0eXBlIjoicmVmcmVzaCIsImp0aSI6Inh5ejk4NzYiLCJleHAiOjE3MzA3MzgxMDAsImlhdCI6MTczMDczNDUwMH0...
+        links:
+          type: object
+          properties:
+            self:
+              $ref: "#/components/schemas/Link"
+            verify:
+              $ref: "#/components/schemas/Link"
+            refresh:
+              $ref: "#/components/schemas/Link"
+            logout:
+              $ref: "#/components/schemas/Link"
+            books:
+              $ref: "#/components/schemas/Link"
+            statistics:
+              $ref: "#/components/schemas/Link"
+        meta:
+          type: object
+          properties:
+            access_token_expires_in:
+              type: integer
+              example: 300
+              description: Access token lifetime in seconds
+            refresh_token_expires_in:
+              type: integer
+              example: 3600
+              description: Refresh token lifetime in seconds
+            timestamp:
+              type: string
+              format: date-time
+              example: "2025-11-04T10:30:00.000000Z"
+
+    RefreshRequest:
+      type: object
+      required:
+        - refresh_token
+      properties:
+        refresh_token:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+    RefreshResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success]
+        message:
+          type: string
+          example: Access token refreshed
+        data:
+          type: object
+          properties:
+            access_token:
+              type: string
+              example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        links:
+          type: object
+        meta:
+          type: object
+          properties:
+            access_token_expires_in:
+              type: integer
+              example: 300
+            timestamp:
+              type: string
+              format: date-time
+
+    LogoutRequest:
+      type: object
+      properties:
+        refresh_token:
+          type: string
+          description: Optional refresh token to revoke
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+    UserInfo:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        username:
+          type: string
+          example: admin
+        role:
+          type: string
+          enum: [admin, user]
+          example: admin
+
+    Link:
+      type: object
+      properties:
+        href:
+          type: string
+          example: /api/books
+        method:
+          type: string
+          enum: [GET, POST, PUT, DELETE]
+          example: GET
+
+    Book:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        book_key:
+          type: string
+          example: OL123456W
+        title:
+          type: string
+          example: Harry Potter and the Philosopher's Stone
+        author:
+          type: string
+          example: J.K. Rowling
+          nullable: true
+        cover_url:
+          type: string
+          example: https://covers.openlibrary.org/b/id/8739161-M.jpg
+          nullable: true
+        quantity:
+          type: integer
+          example: 5
+          minimum: 1
+        available:
+          type: integer
+          example: 3
+          minimum: 0
+        borrowed:
+          type: integer
+          example: 2
+          minimum: 0
+        links:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/Link"
+
+    CreateBookRequest:
+      type: object
+      required:
+        - book_key
+        - title
+      properties:
+        book_key:
+          type: string
+          example: OL123456W
+          description: Unique book identifier
+        title:
+          type: string
+          example: Harry Potter and the Philosopher's Stone
+          minLength: 1
+        author:
+          type: string
+          example: J.K. Rowling
+          default: Unknown
+        cover_url:
+          type: string
+          example: https://covers.openlibrary.org/b/id/8739161-M.jpg
+        quantity:
+          type: integer
+          example: 5
+          minimum: 1
+          default: 1
+
+    UpdateBookRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          example: Harry Potter and the Philosopher's Stone
+        author:
+          type: string
+          example: J.K. Rowling
+        cover_url:
+          type: string
+          example: https://covers.openlibrary.org/b/id/8739161-M.jpg
+        quantity:
+          type: integer
+          example: 10
+          minimum: 1
+
+    BooksListResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success]
+        message:
+          type: string
+          example: Retrieved all library books successfully
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Book"
+        links:
+          type: object
+          properties:
+            self:
+              $ref: "#/components/schemas/Link"
+            create:
+              $ref: "#/components/schemas/Link"
+            prev:
+              $ref: "#/components/schemas/Link"
+            next:
+              $ref: "#/components/schemas/Link"
+        meta:
+          type: object
+          properties:
+            total_count:
+              type: integer
+              example: 25
+            page:
+              type: integer
+              example: 1
+            per_page:
+              type: integer
+              example: 20
+            total_pages:
+              type: integer
+              example: 2
+            timestamp:
+              type: string
+              format: date-time
+
+    Statistics:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success]
+        message:
+          type: string
+          example: Statistics retrieved successfully
+        data:
+          type: object
+          properties:
+            library:
+              type: object
+              properties:
+                total_unique_books:
+                  type: integer
+                  example: 25
+                  description: Total unique book titles
+                total_copies:
+                  type: integer
+                  example: 100
+                  description: Total book copies across all titles
+                total_available:
+                  type: integer
+                  example: 75
+                  description: Available copies
+                total_borrowed:
+                  type: integer
+                  example: 25
+                  description: Currently borrowed copies
+            borrowing:
+              type: object
+              properties:
+                total_borrowed_transactions:
+                  type: integer
+                  example: 15
+                  description: Total number of borrowed book records
+            users:
+              type: object
+              properties:
+                total_users:
+                  type: integer
+                  example: 10
+                total_admins:
+                  type: integer
+                  example: 2
+            top_borrowed_books:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    example: 1
+                  title:
+                    type: string
+                    example: Harry Potter
+                  author:
+                    type: string
+                    example: J.K. Rowling
+                  times_borrowed:
+                    type: integer
+                    example: 5
+        links:
+          type: object
+        meta:
+          type: object
+          properties:
+            timestamp:
+              type: string
+              format: date-time
+            requested_by:
+              type: string
+              example: admin
+
+    BorrowedBook:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        book_id:
+          type: integer
+          example: 5
+        book_key:
+          type: string
+          example: OL123456W
+        title:
+          type: string
+          example: Harry Potter
+        author:
+          type: string
+          example: J.K. Rowling
+        cover_url:
+          type: string
+          example: https://covers.openlibrary.org/b/id/123-M.jpg
+        borrowed_date:
+          type: string
+          format: date-time
+          example: "2025-11-04T10:00:00Z"
+        links:
+          type: object
+
+    BorrowBookRequest:
+      type: object
+      required:
+        - book_id
+      properties:
+        book_id:
+          type: integer
+          example: 5
+          description: ID of the book to borrow
+
+paths:
+  /:
+    get:
+      tags:
+        - Authentication
+      summary: Root endpoint with API information
+      description: Returns API version, description and available endpoint links
+      responses:
+        "200":
+          description: API information retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                    example: Library Management System with JWT Authentication
+                  data:
+                    type: object
+                    properties:
+                      version:
+                        type: string
+                        example: "2.0"
+                      description:
+                        type: string
+                        example: RESTful API with JWT and HATEOAS
+                  links:
+                    type: object
+                  meta:
+                    type: object
+
+  /api/sessions:
+    post:
+      tags:
+        - Authentication
+      summary: User login
+      description: |
+        Authenticate user and receive access token (5 min) + refresh token (1 hour).
+
+        **Scopes assigned by role:**
+        - Admin: `read:books`, `write:books`, `manage:users`, `read:stats`, `borrow:write`
+        - User: `read:books`, `borrow:write`
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          description: Username and password are required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                status: error
+                message: Username and password are required
+                meta:
+                  required_fields: [username, password]
+        "401":
+          description: Invalid username or password
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      tags:
+        - Authentication
+      summary: Logout
+      description: |
+        Logout user by:
+        1. Blacklisting current access token (until expiry)
+        2. Revoking refresh token (if provided)
+      security:
+        - BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LogoutRequest"
+      responses:
+        "200":
+          description: Logged out successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                    example: Logged out successfully
+                  links:
+                    type: object
+                  meta:
+                    type: object
+        "401":
+          description: Token is missing or invalid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/sessions/refresh:
+    post:
+      tags:
+        - Authentication
+      summary: Refresh access token
+      description: |
+        Get a new access token using valid refresh token.
+        Refresh token is NOT rotated (reuse same refresh token).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshRequest"
+      responses:
+        "200":
+          description: Access token refreshed successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RefreshResponse"
+        "400":
+          description: refresh_token is required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Invalid or expired refresh token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/sessions/me:
+    get:
+      tags:
+        - Authentication
+      summary: Verify token and get user info
+      description: Verify current access token is valid and get user information
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Token is valid
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                    example: Token is valid
+                  data:
+                    $ref: "#/components/schemas/UserInfo"
+                  links:
+                    type: object
+                  meta:
+                    type: object
+                    properties:
+                      token_expires_at:
+                        type: string
+                        format: date-time
+                      timestamp:
+                        type: string
+                        format: date-time
+        "401":
+          description: Token is invalid or expired
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/books:
+    get:
+      tags:
+        - Admin - Books
+      summary: Get all books (with pagination)
+      description: |
+        Retrieve all library books with pagination support.
+        Available to authenticated users (admin and user).
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+          description: Page number
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+          description: Items per page
+      responses:
+        "200":
+          description: Books retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BooksListResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    post:
+      tags:
+        - Admin - Books
+      summary: Create new book (Admin only)
+      description: Add a new book to the library. Admin access required.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBookRequest"
+      responses:
+        "201":
+          description: Book created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                    example: Book created successfully
+                  data:
+                    $ref: "#/components/schemas/Book"
+                  links:
+                    type: object
+                  meta:
+                    type: object
+                    properties:
+                      created_at:
+                        type: string
+                        format: date-time
+                      created_by:
+                        type: string
+                        example: admin
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                status: error
+                message: book_key and title are required
+                meta:
+                  required_fields: [book_key, title]
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Book with this book_key already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/books/{book_id}:
+    get:
+      tags:
+        - Admin - Books
+      summary: Get book details by ID
+      description: Retrieve detailed information about a specific book
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: book_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Book ID
+      responses:
+        "200":
+          description: Book details retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                    example: Book retrieved successfully
+                  data:
+                    $ref: "#/components/schemas/Book"
+                  links:
+                    type: object
+                  meta:
+                    type: object
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Book not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    put:
+      tags:
+        - Admin - Books
+      summary: Update book information (Admin only)
+      description: Update book details. Admin access required.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: book_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Book ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBookRequest"
+      responses:
+        "200":
+          description: Book updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                    example: Book updated successfully
+                  data:
+                    $ref: "#/components/schemas/Book"
+                  links:
+                    type: object
+                  meta:
+                    type: object
+                    properties:
+                      updated_at:
+                        type: string
+                        format: date-time
+                      updated_by:
+                        type: string
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Book not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      tags:
+        - Admin - Books
+      summary: Delete book (Admin only)
+      description: |
+        Delete a book from the library. Admin access required.
+        Cannot delete if book is currently borrowed.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: book_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Book ID
+      responses:
+        "200":
+          description: Book deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                    example: Book deleted successfully
+                  data:
+                    $ref: "#/components/schemas/Book"
+                  links:
+                    type: object
+                  meta:
+                    type: object
+                    properties:
+                      deleted_at:
+                        type: string
+                        format: date-time
+                      deleted_by:
+                        type: string
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Book not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Cannot delete - book is currently borrowed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/statistics:
+    get:
+      tags:
+        - Admin - Statistics
+      summary: Get library statistics (Admin only)
+      description: |
+        Retrieve comprehensive library statistics including:
+        - Library metrics (books, copies, borrowed)
+        - User counts
+        - Top 5 most borrowed books
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Statistics retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Statistics"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/users/{user_id}/borrowed-books:
+    get:
+      tags:
+        - User - Borrowing
+      summary: Get user's borrowed books
+      description: |
+        Retrieve list of books borrowed by a specific user.
+        Users can only view their own borrowed books.
+        Admins can view any user's borrowed books.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: User ID
+      responses:
+        "200":
+          description: Borrowed books retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                    example: Retrieved borrowed books successfully
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BorrowedBook"
+                  links:
+                    type: object
+                  meta:
+                    type: object
+                    properties:
+                      total_borrowed:
+                        type: integer
+                        example: 3
+                      user_id:
+                        type: integer
+                        example: 2
+                      timestamp:
+                        type: string
+                        format: date-time
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Access denied. You can only view your own borrowed books
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    post:
+      tags:
+        - User - Borrowing
+      summary: Borrow a book
+      description: |
+        Borrow a book from the library.
+        Users can only borrow books for themselves.
+        Book must be available (not all copies borrowed).
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: User ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BorrowBookRequest"
+      responses:
+        "201":
+          description: Book borrowed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                    example: Book borrowed successfully
+                  data:
+                    $ref: "#/components/schemas/BorrowedBook"
+                  links:
+                    type: object
+                  meta:
+                    type: object
+                    properties:
+                      borrowed_at:
+                        type: string
+                        format: date-time
+                      borrowed_by:
+                        type: string
+        "400":
+          description: book_id is required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Access denied. You can only borrow books for yourself
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Book not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Book not available or already borrowed by you
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/users/{user_id}/borrowed-books/{book_id}:
+    delete:
+      tags:
+        - User - Borrowing
+      summary: Return a borrowed book
+      description: |
+        Return a book to the library.
+        Users can only return their own borrowed books.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: User ID
+        - name: book_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Book ID (library book ID, not borrowed record ID)
+      responses:
+        "200":
+          description: Book returned successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                    example: Book returned successfully
+                  data:
+                    $ref: "#/components/schemas/BorrowedBook"
+                  links:
+                    type: object
+                  meta:
+                    type: object
+                    properties:
+                      returned_at:
+                        type: string
+                        format: date-time
+                      returned_by:
+                        type: string
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Access denied. You can only return your own borrowed books
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No borrowed record found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"

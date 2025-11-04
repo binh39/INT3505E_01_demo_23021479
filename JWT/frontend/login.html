@@ -228,6 +228,7 @@
       </div>
     </div>
 
+    <script src="auth.js"></script>
     <script>
       const API_URL = "http://localhost:5000";
 
@@ -259,7 +260,7 @@
           loginBtn.innerHTML = '<span class="loading"></span>';
 
           try {
-            const response = await fetch(`${API_URL}/api/auth/login`, {
+            const response = await fetch(`${API_URL}/api/sessions`, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
@@ -270,12 +271,18 @@
             const data = await response.json();
 
             if (response.ok) {
-              // Lưu token và thông tin user
-              localStorage.setItem("token", data.data.token);
-              localStorage.setItem("user", JSON.stringify(data.data.user));
+              // Lưu token và thông tin user (theo format mới)
+              const user = {
+                id: data.data.id,
+                username: data.data.username,
+                role: data.data.role,
+              };
+              localStorage.setItem("access_token", data.data.access_token);
+              localStorage.setItem("refresh_token", data.data.refresh_token);
+              localStorage.setItem("user", JSON.stringify(user));
 
               // Chuyển hướng theo role
-              if (data.data.user.role === "admin") {
+              if (user.role === "admin") {
                 window.location.href = "admin.html";
               } else {
                 window.location.href = "user.html";
@@ -297,7 +304,7 @@
 
       // Kiểm tra nếu đã đăng nhập
       window.addEventListener("DOMContentLoaded", () => {
-        const token = localStorage.getItem("token");
+        const token = localStorage.getItem("access_token");
         const user = localStorage.getItem("user");
 
         if (token && user) {

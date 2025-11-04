@@ -2,7 +2,15 @@ from flask import Flask, request, jsonify, url_for
 from flask_cors import CORS
 from werkzeug.security import check_password_hash, generate_password_hash
 from database import get_db_connection, init_db
-from auth import generate_token, admin_required, user_required, token_required
+from auth import (
+    generate_tokens,
+    decode_refresh_token,
+    blacklist_access_token,
+    revoke_refresh_token,
+    admin_required,
+    user_required,
+    token_required,
+)
 from config import Config
 import datetime
 
@@ -13,7 +21,7 @@ CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 init_db()
 
 # ========================================
-# Helper Functions for HATEOAS
+# HATEOAS
 # ========================================
 def create_response(status, message, data=None, links=None, meta=None, status_code=200):
     """Tạo response đồng nhất theo format chuẩn với HATEOAS"""
@@ -34,7 +42,6 @@ def create_response(status, message, data=None, links=None, meta=None, status_co
     return jsonify(response), status_code
 
 def get_book_links(book_id, is_admin=False):
-    """Tạo HATEOAS links cho book resource"""
     links = {
         "self": {"href": f"/api/books/{book_id}", "method": "GET"}
     }
@@ -47,7 +54,6 @@ def get_book_links(book_id, is_admin=False):
     return links
 
 def get_borrowed_book_links(user_id, book_id):
-    """Tạo HATEOAS links cho borrowed book resource"""
     return {
         "self": {"href": f"/api/users/{user_id}/borrowed-books/{book_id}", "method": "GET"},
         "return": {"href": f"/api/users/{user_id}/borrowed-books/{book_id}", "method": "DELETE"},
@@ -108,20 +114,22 @@ def login():
             status_code=401
         )
     
-    # Tạo token
-    token = generate_token(user['id'], user['username'], user['role'])
+    # Tạo access + refresh tokens (kèm scopes theo role)
+    access_token, refresh_token = generate_tokens(user['id'], user['username'], user['role'])
     
     user_data = {
         "id": user['id'],
         "username": user['username'],
         "role": user['role'],
-        "token": token
+        "access_token": access_token,
+        "refresh_token": refresh_token
     }
     
     links = {
         "self": {"href": "/api/sessions", "method": "POST"},
         "verify": {"href": "/api/sessions/me", "method": "GET"},
-        "logout": {"href": "/api/sessions/me", "method": "DELETE"}
+        "refresh": {"href": "/api/sessions/refresh", "method": "POST"},
+        "logout": {"href": "/api/sessions", "method": "DELETE"}
     }
     
     if user['role'] == 'admin':
@@ -137,10 +145,103 @@ def login():
         data=user_data,
         links=links,
         meta={
-            "token_expires_in": Config.JWT_ACCESS_TOKEN_EXPIRES,
+            "access_token_expires_in": Config.JWT_ACCESS_TOKEN_EXPIRES,
+            "refresh_token_expires_in": Config.JWT_REFRESH_TOKEN_EXPIRES,
             "timestamp": datetime.datetime.utcnow().isoformat() + "Z"
         },
         status_code=200
+    )
+
+@app.route("/api/sessions/refresh", methods=["POST"])
+def refresh_access_token():
+    """Dùng refresh token để cấp access token mới"""
+    data = request.get_json() or {}
+    refresh_token = data.get("refresh_token")
+    if not refresh_token:
+        return create_response(
+            status="error",
+            message="refresh_token is required",
+            data=None,
+            links={
+                "self": {"href": "/api/sessions/refresh", "method": "POST"},
+                "login": {"href": "/api/sessions", "method": "POST"}
+            },
+            meta={"required_fields": ["refresh_token"]},
+            status_code=400,
+        )
+
+    payload = decode_refresh_token(refresh_token)
+    if not payload:
+        return create_response(
+            status="error",
+            message="Invalid or expired refresh token",
+            links={
+                "self": {"href": "/api/sessions/refresh", "method": "POST"},
+                "login": {"href": "/api/sessions", "method": "POST"}
+            },
+            status_code=401,
+        )
+
+    user_id = payload.get("user_id")
+    conn = get_db_connection()
+    user = conn.execute("SELECT id, username, role FROM users WHERE id = ?", (user_id,)).fetchone()
+    conn.close()
+    if not user:
+        return create_response(
+            status="error",
+            message="User not found",
+            status_code=404,
+        )
+
+    # Cấp access token mới (không rotate refresh token)
+    new_access_token, _ = generate_tokens(user['id'], user['username'], user['role'])
+    return create_response(
+        status="success",
+        message="Access token refreshed",
+        data={
+            "access_token": new_access_token
+        },
+        links={
+            "self": {"href": "/api/sessions/refresh", "method": "POST"},
+            "verify": {"href": "/api/sessions/me", "method": "GET"},
+        },
+        meta={
+            "access_token_expires_in": Config.JWT_ACCESS_TOKEN_EXPIRES,
+            "timestamp": datetime.datetime.utcnow().isoformat() + "Z"
+        },
+        status_code=200,
+    )
+
+@app.route("/api/sessions", methods=["DELETE"])
+@token_required
+def logout(current_user):
+    """Đăng xuất: thu hồi refresh token (nếu có) và vô hiệu hoá access token hiện tại đến khi hết hạn"""
+    # Blacklist access token hiện tại
+    auth_header = request.headers.get("Authorization", "")
+    token = auth_header.split(" ")[1] if auth_header.startswith("Bearer ") else None
+    access_jti = current_user.get("jti")
+    exp_ts = int(current_user.get("exp", 0))
+    if access_jti and exp_ts:
+        blacklist_access_token(access_jti, exp_ts)
+
+    # Thu hồi refresh token nếu client gửi kèm
+    data = request.get_json(silent=True) or {}
+    refresh_token = data.get("refresh_token")
+    if refresh_token:
+        rt_payload = decode_refresh_token(refresh_token)
+        if rt_payload and rt_payload.get("user_id") == current_user.get("user_id"):
+            revoke_refresh_token(rt_payload.get("jti"))
+
+    return create_response(
+        status="success",
+        message="Logged out successfully",
+        links={
+            "login": {"href": "/api/sessions", "method": "POST"}
+        },
+        meta={
+            "timestamp": datetime.datetime.utcnow().isoformat() + "Z"
+        },
+        status_code=200,
     )
 
 @app.route("/api/sessions/me", methods=["GET"])
@@ -155,7 +256,7 @@ def verify_token(current_user):
     
     links = {
         "self": {"href": "/api/sessions/me", "method": "GET"},
-        "logout": {"href": "/api/sessions/me", "method": "DELETE"}
+        "logout": {"href": "/api/sessions", "method": "DELETE"}
     }
     
     if current_user['role'] == 'admin':
@@ -182,7 +283,7 @@ def verify_token(current_user):
 # ========================================
 
 @app.route("/api/books", methods=["GET"])
-@admin_required
+@token_required
 def admin_get_all_books(current_user):
     """Admin: Lấy danh sách tất cả sách trong thư viện"""
     # Lấy query parameters cho pagination

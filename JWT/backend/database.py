@@ -52,6 +52,29 @@ def init_db():
             UNIQUE(user_id, book_key)
         )
     """)
+
+    # Bảng refresh_tokens: lưu refresh token theo jti để có thể revoke/rotate
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS refresh_tokens (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            jti TEXT UNIQUE NOT NULL,
+            user_id INTEGER NOT NULL,
+            expires_at INTEGER NOT NULL,
+            revoked INTEGER DEFAULT 0,
+            created_at INTEGER DEFAULT (strftime('%s','now')),
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+    """)
+
+    # Bảng access_token_blacklist: lưu các access token đã bị thu hồi trước khi hết hạn
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS access_token_blacklist (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            jti TEXT UNIQUE NOT NULL,
+            expires_at INTEGER NOT NULL,
+            blacklisted_at INTEGER DEFAULT (strftime('%s','now'))
+        )
+    """)
     
     # Tạo 2 tài khoản mẫu nếu chưa có
     c.execute("SELECT COUNT(*) FROM users")
