@@ -199,7 +199,7 @@ def api_products_post(body):  # noqa: E501
 # DELETE /api/products/{product_id}
 @admin_required
 def api_products_product_id_delete(product_id):  # noqa: E501
-    """Delete product (Admin only) - Soft delete by setting status to discontinued"""
+    """Delete product (Admin only) - Hard delete removes from database"""
     try:
         try:
             obj_id = ObjectId(product_id)
@@ -209,29 +209,24 @@ def api_products_product_id_delete(product_id):  # noqa: E501
         product = products_collection.find_one({"_id": obj_id})
         if not product:
             return {"status": "error", "message": "Product not found"}, 404
-        
-        # Check if already discontinued
-        if product.get("status") == "discontinued":
-            return {"status": "error", "message": "Product already discontinued"}, 400
+
+        # Store product info before deletion
+        product_info = {
+            "id": str(product["_id"]),
+            "sku": product.get("sku"),
+            "name": product.get("name")
+        }
 
         now = datetime.now(timezone.utc).isoformat()
-        result = products_collection.update_one(
-            {"_id": obj_id},
-            {"$set": {"status": "discontinued", "updated_at": now}}
-        )
+        result = products_collection.delete_one({"_id": obj_id})
         
-        if result.modified_count == 0:
+        if result.deleted_count == 0:
             return {"status": "error", "message": "Failed to delete product"}, 500
-
-        # Get updated product
-        updated_product = products_collection.find_one({"_id": obj_id})
-        updated_product["id"] = str(updated_product["_id"])
-        updated_product.pop("_id", None)
 
         return {
             "status": "success",
-            "message": "Product deleted successfully",
-            "data": updated_product,
+            "message": "Product permanently deleted",
+            "data": product_info,
             "links": {
                 "all_products": {"href": "/api/products", "method": "GET"}
             },
