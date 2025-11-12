@@ -1,5 +1,10 @@
-connexion >= 2.6.0
-connexion[swagger-ui] >= 2.6.0
-python_dateutil == 2.6.0
-setuptools >= 21.0.0
-swagger-ui-bundle >= 0.0.2
+connexion
+connexion[swagger-ui]
+python_dateutil
+setuptools
+swagger-ui-bundle
+connexion[swagger-ui]
+swagger-ui-bundle
+python_dateutil
+flask
+werkzeug
