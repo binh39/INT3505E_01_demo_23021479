@@ -122,6 +122,8 @@ paths:
       responses:
         '204':
           description: Xóa bài viết thành công (No Content).
+          status: "success"
+          message: Bài viết đã được xóa thành công.
         '403':
           $ref: '#/components/responses/Forbidden'
 
@@ -181,6 +183,8 @@ paths:
       responses:
         '204':
           description: Bỏ Reaction thành công.
+          status: "success"
+          message: Reaction đã được bỏ thành công.
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -279,6 +283,8 @@ paths:
       responses:
         '204':
           description: Xóa Comment thành công.
+          status: "success"
+          message: Comment đã được xóa thành công.
 
   ## REACTION PATHS (Cho Comment)
   /comments/{comment_id}/reactions:
@@ -329,6 +335,8 @@ paths:
       responses:
         '204':
           description: Bỏ Reaction thành công.
+          status: "success"
+          message: Reaction đã được bỏ thành công.
           
 components:
   securitySchemes:
@@ -383,8 +391,13 @@ components:
     Link:
       type: object
       properties:
-        href: { type: string, format: url, description: Đường dẫn tài nguyên. }
-        method: { type: string, description: HTTP Method. }
+        href:
+          type: string
+          format: url
+          description: Đường dẫn tài nguyên.
+        method:
+          type: string
+          description: HTTP Method.
     Links:
       type: object
       additionalProperties:
@@ -392,9 +405,13 @@ components:
     Pagination:
       type: object
       properties:
-        limit: { type: integer }
-        offset: { type: integer }
-        total_items: { type: integer, description: Tổng số bản ghi (khi không dùng cursor). }
+        limit:
+          type: integer
+        offset:
+          type: integer
+        total_items:
+          type: integer
+          description: Tổng số bản ghi (khi không dùng cursor).
     Metadata:
       type: object
       properties:
@@ -405,9 +422,15 @@ components:
     SuccessResponse:
       type: object
       properties:
-        status: { type: string, default: success }
-        message: { type: string, description: Mô tả thành công. }
-        data: { type: object, description: Dữ liệu trả về (tùy thuộc vào endpoint). }
+        status:
+          type: string
+          default: success
+        message:
+          type: string
+          description: Mô tả thành công.
+        data:
+          type: object
+          description: Dữ liệu trả về (tùy thuộc vào endpoint).
         _links:
           $ref: '#/components/schemas/Links'
         metadata:
@@ -417,15 +440,26 @@ components:
     ErrorDetail:
       type: object
       properties:
-        field: { type: string, description: Trường bị lỗi (validation). }
-        message: { type: string, description: Mô tả lỗi chi tiết. }
+        field:
+          type: string
+          description: Trường bị lỗi (validation).
+        message:
+          type: string
+          description: Mô tả lỗi chi tiết.
+    
     # Cấu trúc Phản hồi Lỗi Thống nhất
     ErrorResponse:
       type: object
       properties:
-        status: { type: string, default: error }
-        code: { type: string, description: Mã lỗi nội bộ (Ví dụ: RESOURCE_NOT_FOUND). }
-        message: { type: string, description: Mô tả lỗi. }
+        status:
+          type: string
+          default: error
+        code:
+          type: string
+          description: Mã lỗi nội bộ (Ví dụ RESOURCE_NOT_FOUND).
+        message:
+          type: string
+          description: Mô tả lỗi.
         details:
           type: array
           items:
@@ -437,7 +471,7 @@ components:
       required: [content] # Giả định content hoặc media phải có, nhưng chỉ content là text cần thiết.
       properties:
         content: { type: string }
-        media_ids: { type: array, items: { type: string }, description: List ID Media từ Media Service. }
+        media_urls: { type: array, items: { type: string }, description: List ID Media từ Media Service. }
         tags: { type: array, items: { type: string } }
         post_share_id: { type: string, description: ID bài viết được chia sẻ. }
         group_id: { type: string, description: ID Group đăng bài. }
@@ -448,7 +482,7 @@ components:
       type: object
       properties:
         content: { type: string }
-        media_ids: { type: array, items: { type: string }, description: Ghi đè list ID Media cũ. }
+        media_urls: { type: array, items: { type: string }, description: Ghi đè list ID Media cũ. }
         tags: { type: array, items: { type: string } }
         visibility: { type: string, enum: [public, friends, private] }
 
@@ -458,7 +492,7 @@ components:
         id: { type: string }
         user_id: { type: string }
         content: { type: string }
-        media_ids: { type: array, items: { type: string } }
+        media_urls: { type: array, items: { type: string } }
         likes_count: { type: integer }
         comments_count: { type: integer }
         # ... các trường khác
@@ -516,7 +550,7 @@ components:
       required: [content]
       properties:
         content: { type: string }
-        media_ids: { type: array, items: { type: string } }
+        media_urls: { type: array, items: { type: string } }
         tags: { type: array, items: { type: string } }
         parent_id: { type: string, description: ID Comment cha nếu là Reply. }
 
@@ -524,7 +558,7 @@ components:
       type: object
       properties:
         content: { type: string }
-        media_ids: { type: array, items: { type: string } }
+        media_urls: { type: array, items: { type: string } }
         tags: { type: array, items: { type: string } }
         
     CommentObject:

@@ -3,18 +3,12 @@ import time
 from locust import HttpUser, task, between
 from json.decoder import JSONDecodeError
 
-# --- HÀNH VI CHUNG CHO MỌI NGƯỜI DÙNG (BASE CLASS) ---
 class BaseAuthUser(HttpUser):
-    # Sử dụng URL từ file YAML: http://localhost:5000 (hoặc thay bằng cổng bạn đang chạy)
     host = "http://127.0.0.1:8080"
-    
-    # Thời gian chờ ngẫu nhiên giữa các task (1 đến 3 giây)
     wait_time = between(1, 3) 
     
     # Đánh dấu đây là abstract class - Locust sẽ KHÔNG chạy class này
     abstract = True
-    
-    # Lưu trữ token và ID sản phẩm để sử dụng trong các task khác
     access_token = None
     product_id_created = None
     
@@ -51,20 +45,16 @@ class BaseAuthUser(HttpUser):
 
 # --- 1. ADMIN USER (Full Access) ---
 class AdminUser(BaseAuthUser):
-    weight = 8  # Tăng tỉ lệ xuất hiện của AdminUser trong tổng số người dùng ảo
-    # Dùng tài khoản admin
+    weight = 8
     credentials = {"username": "admin", "password": "admin123"}
-    
-    # Tạo dữ liệu ngẫu nhiên cho POST
     product_counter = 0
 
     @task(3)
     def view_products(self):
         """GET /api/products (UserProducts & AdminProducts)"""
-        # Mô phỏng truy cập các trang khác nhau
         self.client.get(f"/api/products?page={random.randint(1, 2)}&limit=20", name="/api/products [GET]")
 
-    @task(1) # Tần suất thấp hơn GET
+    @task(1)
     def create_product(self):
         """POST /api/products (AdminProducts)"""
         AdminUser.product_counter += 1
@@ -96,11 +86,10 @@ class AdminUser(BaseAuthUser):
 
 # --- 2. USER USER (View Only) ---
 class NormalUser(BaseAuthUser):
-    weight = 2  # Tăng tỉ lệ xuất hiện của NormalUser trong tổng số người dùng ảo
-    # Dùng tài khoản user
+    weight = 2
     credentials = {"username": "user", "password": "user123"}
     SAMPLE_PRODUCT_IDS = [
-        "690a23ff6f7edf67a0b8973f", # ID do bạn cung cấp
+        "690a23ff6f7edf67a0b8973f",
         "690a23ff6f7edf67a0b89740",
         "690a23ff6f7edf67a0b89742",
         "690a23ff6f7edf67a0b89743",
@@ -110,7 +99,6 @@ class NormalUser(BaseAuthUser):
     @task(5)
     def view_products_list(self):
         """GET /api/products (UserProducts)"""
-        # User chủ yếu xem danh sách sản phẩm, tần suất cao hơn
         self.client.get(f"/api/products?sort=price_desc&category=Electronics", name="/api/products [GET/List]")
 
     @task(3)
