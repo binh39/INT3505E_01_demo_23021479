@@ -31,6 +31,7 @@ def format_transaction_response(transaction):
         'amount': transaction['amount'],
         'payment_token': transaction['payment_token'],
         'status': transaction['status'],
+        'code': transaction['code'],
         'created_at': transaction['created_at'],
     }
 
