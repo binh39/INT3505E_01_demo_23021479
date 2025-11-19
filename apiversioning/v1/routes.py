@@ -24,6 +24,7 @@ def format_payment_response(payment):
         'transaction_id': payment['transaction_id'],
         'amount': payment['amount'],
         'card_number': payment['card_number'],
+        'status': payment['status'],
         'created_at': payment['created_at'],
     }
 

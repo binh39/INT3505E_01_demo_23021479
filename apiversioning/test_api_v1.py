@@ -10,7 +10,6 @@ def print_response(title, response):
     """Print formatted response"""
     print("\n" + "="*60)
     print(f"{title}")
-    print("="*60)
     print(f"Status Code: {response.status_code}")
     print(f"Response:")
     print(json.dumps(response.json(), indent=2, ensure_ascii=False))
@@ -18,7 +17,6 @@ def print_response(title, response):
 
 def test_api_v1():
     """Test all v1 endpoints"""
-    
     # Test 1: Create a payment
     print("\n🔹 TEST 1: Create Payment (POST)")
     payment_data = {

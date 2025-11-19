@@ -33,10 +33,6 @@ def format_transaction_response(transaction):
         'status': transaction['status'],
         'code': transaction['code'],
         'created_at': transaction['created_at'],
-        '_deprecated': {
-            'message': 'Fields transaction_id, card_number, and status_code are deprecated. Please use id, payment_token, and code instead.',
-            'migration_guide': '/api/v2/migration-guide'
-        }
     }
 
 @v2_bp.route('/transactions', methods=['GET'])
@@ -61,7 +57,7 @@ def get_transactions():
         transactions_list = [format_transaction_response(transaction) for transaction in transactions]
         
         return jsonify({
-            'status_code': 200,
+            'code': 200,
             'message': 'Transactions retrieved successfully',
             'data': transactions_list,
             'links': generate_hateoas_links()
@@ -69,7 +65,7 @@ def get_transactions():
         
     except Exception as e:
         return jsonify({
-            'status_code': 500,
+            'code': 500,
             'message': f'Internal server error: {str(e)}',
             'data': None,
             'links': generate_hateoas_links()
@@ -90,14 +86,14 @@ def get_transaction(transaction_id):
         
         if transaction is None:
             return jsonify({
-                'status_code': 404,
+                'code': 404,
                 'message': f'Transaction with ID {transaction_id} not found',
                 'data': None,
                 'links': generate_hateoas_links()
             }), 404
         
         return jsonify({
-            'status_code': 200,
+            'code': 200,
             'message': 'Transaction retrieved successfully',
             'data': format_transaction_response(transaction),
             'links': generate_hateoas_links(transaction_id)
@@ -105,7 +101,7 @@ def get_transaction(transaction_id):
         
     except Exception as e:
         return jsonify({
-            'status_code': 500,
+            'code': 500,
             'message': f'Internal server error: {str(e)}',
             'data': None,
             'links': generate_hateoas_links()
@@ -136,7 +132,7 @@ def create_transaction():
         # Validation
         if not data:
             return jsonify({
-                'status_code': 400,
+                'code': 400,
                 'message': 'Request body is required',
                 'data': None,
                 'links': generate_hateoas_links()
@@ -147,7 +143,7 @@ def create_transaction():
         
         if missing_fields:
             return jsonify({
-                'status_code': 400,
+                'code': 400,
                 'message': f'Missing required fields: {", ".join(missing_fields)}',
                 'data': None,
                 'links': generate_hateoas_links()
@@ -157,7 +153,7 @@ def create_transaction():
         valid_statuses = ['SUCCESS', 'PENDING', 'REFUND']
         if data['status'] not in valid_statuses:
             return jsonify({
-                'status_code': 400,
+                'code': 400,
                 'message': f'Invalid status. Must be one of: {", ".join(valid_statuses)}',
                 'data': None,
                 'links': generate_hateoas_links()
@@ -169,7 +165,7 @@ def create_transaction():
         
         if not payment_token and not card_number:
             return jsonify({
-                'status_code': 400,
+                'code': 400,
                 'message': 'Either payment_token or card_number is required',
                 'data': None,
                 'links': generate_hateoas_links()
@@ -219,7 +215,7 @@ def create_transaction():
             ]
         
         return jsonify({
-            'status_code': 201,
+            'code': 201,
             'message': 'Transaction created successfully',
             'data': response_data,
             'links': generate_hateoas_links(new_transaction_id)
@@ -227,7 +223,7 @@ def create_transaction():
         
     except Exception as e:
         return jsonify({
-            'status_code': 500,
+            'code': 500,
             'message': f'Internal server error: {str(e)}',
             'data': None,
             'links': generate_hateoas_links()
@@ -250,7 +246,7 @@ def delete_transaction(transaction_id):
         if transaction is None:
             conn.close()
             return jsonify({
-                'status_code': 404,
+                'code': 404,
                 'message': f'Transaction with ID {transaction_id} not found',
                 'data': None,
                 'links': generate_hateoas_links()
@@ -262,7 +258,7 @@ def delete_transaction(transaction_id):
         conn.close()
         
         return jsonify({
-            'status_code': 200,
+            'code': 200,
             'message': f'Transaction with ID {transaction_id} deleted successfully',
             'data': None,
             'links': generate_hateoas_links()
@@ -270,72 +266,8 @@ def delete_transaction(transaction_id):
         
     except Exception as e:
         return jsonify({
-            'status_code': 500,
+            'code': 500,
             'message': f'Internal server error: {str(e)}',
             'data': None,
             'links': generate_hateoas_links()
         }), 500
-
-@v2_bp.route('/migration-guide', methods=['GET'])
-def migration_guide():
-    """
-    GET /api/v2/migration-guide
-    Provides migration guide from v1 to v2.
-    """
-    guide = {
-        'status_code': 200,
-        'message': 'Migration guide from v1 to v2',
-        'data': {
-            'version': '2.0.0',
-            'breaking_changes': [
-                {
-                    'change': 'Resource renamed',
-                    'v1': '/api/v1/payments',
-                    'v2': '/api/v2/transactions',
-                    'reason': 'Better semantic naming for payment transactions'
-                },
-                {
-                    'change': 'Field removed: transaction_id',
-                    'v1': 'transaction_id (string)',
-                    'v2': 'id (integer)',
-                    'reason': 'Use id directly instead of separate transaction_id'
-                },
-                {
-                    'change': 'Field renamed: card_number → payment_token',
-                    'v1': 'card_number (string, plain text)',
-                    'v2': 'payment_token (string, tokenized)',
-                    'reason': 'Enhanced security - no more plain card numbers'
-                },
-                {
-                    'change': 'Field renamed: status_code → code',
-                    'v1': 'status_code (integer)',
-                    'v2': 'code (integer)',
-                    'reason': 'Simplified naming convention'
-                }
-            ],
-            'deprecation_timeline': {
-                'v1_deprecation_date': '2026-01-19',
-                'v1_sunset_date': '2026-06-19',
-                'message': 'v1 will be fully deprecated on June 19, 2026. Please migrate to v2 before this date.'
-            },
-            'migration_steps': [
-                '1. Update your base URL from /api/v1/payments to /api/v2/transactions',
-                '2. Replace card_number with payment_token in your requests',
-                '3. Use id instead of transaction_id in your code',
-                '4. Update response parsing to use code instead of status_code',
-                '5. Test thoroughly in a staging environment',
-                '6. Deploy to production with proper monitoring'
-            ],
-            'backward_compatibility': {
-                'message': 'v2 API accepts card_number for backward compatibility but will return a deprecation warning. It will automatically generate a payment_token.',
-                'recommendation': 'Start using payment_token immediately to avoid future issues.'
-            }
-        },
-        'links': {
-            'self': '/api/v2/migration-guide',
-            'v1_api': '/api/v1/payments',
-            'v2_api': '/api/v2/transactions'
-        }
-    }
-    
-    return jsonify(guide), 200
