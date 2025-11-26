@@ -1,322 +1,318 @@
-# Social Media API - Post & Interaction Service
+# 📚 Library API - Simple RESTful Backend
 
-RESTful API cho dịch vụ Bài viết (Post) và Tương tác (Comment, Reaction) - xây dựng với Node.js, Express, TypeScript và MongoDB.
+Backend đơn giản với Flask và SQLite để quản lý mượn trả sách.
 
-## 📋 Mục lục
+## 🚀 Quick Start
 
-- [Tính năng](#tính-năng)
-- [Công nghệ sử dụng](#công-nghệ-sử-dụng)
-- [Yêu cầu hệ thống](#yêu-cầu-hệ-thống)
-- [Cài đặt](#cài-đặt)
-- [Cấu hình](#cấu-hình)
-- [Chạy ứng dụng](#chạy-ứng-dụng)
-- [API Documentation](#api-documentation)
-- [Cấu trúc dự án](#cấu-trúc-dự-án)
-- [API Endpoints](#api-endpoints)
-
-## ✨ Tính năng
-
-### Posts (Bài viết)
-- ✅ Tạo, đọc, cập nhật, xóa bài viết (CRUD)
-- ✅ Tìm kiếm bài viết theo nội dung, user, tags, status
-- ✅ Phân trang (offset-based và cursor-based)
-- ✅ Sắp xếp bài viết
-- ✅ Kiểm soát quyền riêng tư (public, friends, private)
-
-### Comments (Bình luận)
-- ✅ Tạo, đọc, cập nhật, xóa comment
-- ✅ Hỗ trợ reply comment (nested comments)
-- ✅ Đếm số lượng reactions và replies
-- ✅ Phân trang comments
-
-### Reactions (Tương tác)
-- ✅ Thêm/cập nhật reaction cho post và comment
-- ✅ Xóa reaction
-- ✅ 6 loại reaction: like, love, haha, wow, sad, angry
-- ✅ Lọc reactions theo loại
-
-### Tính năng chung
-- ✅ JWT Authentication
-- ✅ HATEOAS Links (RESTful Level 3)
-- ✅ Validation với express-validator
-- ✅ Error handling thống nhất
-- ✅ Response format chuẩn
-- ✅ API Documentation với Swagger
-- ✅ Security với Helmet
-- ✅ CORS configuration
-- ✅ Request compression
-- ✅ Logging với Morgan
-
-## 🛠 Công nghệ sử dụng
-
-- **Runtime**: Node.js
-- **Language**: TypeScript
-- **Framework**: Express.js
-- **Database**: MongoDB với Mongoose ODM
-- **Authentication**: JWT (JSON Web Tokens)
-- **Validation**: express-validator
-- **Documentation**: Swagger/OpenAPI
-- **Security**: Helmet, CORS
-- **Logging**: Morgan
-
-## 📦 Yêu cầu hệ thống
-
-- Node.js >= 18.x
-- MongoDB >= 5.x
-- npm hoặc yarn
-
-## 🚀 Cài đặt
-
-1. **Clone repository**
+### 1. Cài đặt dependencies
 ```bash
-git clone <repository-url>
-cd service_operation
+pip install -r requirements.txt
 ```
 
-2. **Cài đặt dependencies**
+### 2. Chạy server
 ```bash
-npm install
+python app.py
 ```
 
-3. **Tạo file .env**
+Server sẽ chạy tại: **http://localhost:5000**
+
+## 🔐 Authentication
+
+Tất cả các endpoints (trừ `/`) yêu cầu Bearer Token trong header:
+
+```
+Authorization: Bearer demo123
+```
+
+## 📖 API Endpoints
+
+### 1. **GET /api/books** - Lấy danh sách sách đã mượn
+
+**Request:**
 ```bash
-cp .env.example .env
+curl -H "Authorization: Bearer demo123" http://localhost:5000/api/books
 ```
 
-## ⚙️ Cấu hình
-
-Chỉnh sửa file `.env` với thông tin của bạn:
-
-```env
-# Server Configuration
-NODE_ENV=development
-PORT=3000
-API_VERSION=v1
-
-# Database Configuration
-MONGODB_URI=mongodb://localhost:27017/social_media_db
-
-# JWT Configuration
-JWT_SECRET=your_super_secret_jwt_key_change_this_in_production
-JWT_EXPIRES_IN=7d
-
-# CORS Configuration
-CORS_ORIGIN=http://localhost:3000,http://localhost:3001
-```
-
-## 🏃 Chạy ứng dụng
-
-### Development Mode
-```bash
-npm run dev
-```
-
-### Production Build
-```bash
-# Build TypeScript to JavaScript
-npm run build
-
-# Start production server
-npm start
-```
-
-### Testing
-```bash
-# Run tests
-npm test
-
-# Run tests in watch mode
-npm run test:watch
-```
-
-Server sẽ chạy tại: `http://localhost:3000`
-
-## 📚 API Documentation
-
-Sau khi khởi động server, truy cập Swagger UI tại:
-
-```
-http://localhost:3000/api-docs
-```
-
-Health check endpoint:
-```
-http://localhost:3000/v1/health
-```
-
-## 📁 Cấu trúc dự án
-
-```
-service_operation/
-├── src/
-│   ├── config/           # Cấu hình (env, database, swagger)
-│   ├── controllers/      # Request handlers
-│   ├── middlewares/      # Express middlewares (auth, error, validation)
-│   ├── models/           # MongoDB models (Mongoose schemas)
-│   ├── routes/           # API routes
-│   ├── services/         # Business logic
-│   ├── types/            # TypeScript type definitions
-│   ├── utils/            # Utility functions (response, pagination, jwt)
-│   ├── validators/       # Request validation schemas
-│   ├── app.ts           # Express app configuration
-│   └── server.ts        # Server entry point
-├── .env.example         # Environment variables template
-├── .gitignore
-├── package.json
-├── tsconfig.json
-└── README.md
-```
-
-## 🔌 API Endpoints
-
-### Posts
-
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| GET | `/v1/posts` | Optional | Lấy danh sách bài viết |
-| POST | `/v1/posts` | Required | Tạo bài viết mới |
-| GET | `/v1/posts/:post_id` | Optional | Lấy chi tiết bài viết |
-| PATCH | `/v1/posts/:post_id` | Required | Cập nhật bài viết |
-| DELETE | `/v1/posts/:post_id` | Required | Xóa bài viết |
-
-### Comments
-
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| GET | `/v1/posts/:post_id/comments` | Optional | Lấy danh sách comments |
-| POST | `/v1/posts/:post_id/comments` | Required | Tạo comment mới |
-| GET | `/v1/posts/:post_id/comments/:comment_id` | Optional | Lấy chi tiết comment |
-| PATCH | `/v1/posts/:post_id/comments/:comment_id` | Required | Cập nhật comment |
-| DELETE | `/v1/posts/:post_id/comments/:comment_id` | Required | Xóa comment |
-
-### Reactions
-
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| GET | `/v1/posts/:post_id/reactions` | Optional | Lấy reactions của post |
-| POST | `/v1/posts/:post_id/reactions` | Required | Thêm/cập nhật reaction |
-| DELETE | `/v1/posts/:post_id/reactions` | Required | Xóa reaction |
-| GET | `/v1/comments/:comment_id/reactions` | Optional | Lấy reactions của comment |
-| POST | `/v1/comments/:comment_id/reactions` | Required | Thêm/cập nhật reaction |
-| DELETE | `/v1/comments/:comment_id/reactions` | Required | Xóa reaction |
-
-## 📝 Request/Response Examples
-
-### Create Post
-```bash
-POST /v1/posts
-Authorization: Bearer <jwt_token>
-Content-Type: application/json
-
-{
-  "content": "This is my first post!",
-  "tags": ["intro", "hello"],
-  "visibility": "public"
-}
-```
-
-Response:
+**Response (200):**
 ```json
 {
   "status": "success",
-  "message": "Post created successfully",
-  "data": {
-    "id": "65abc123...",
-    "user_id": "user123",
-    "content": "This is my first post!",
-    "tags": ["intro", "hello"],
-    "visibility": "public",
-    "likes_count": 0,
-    "comments_count": 0,
-    "created_at": "2024-01-20T10:00:00.000Z",
-    "updated_at": "2024-01-20T10:00:00.000Z"
-  },
+  "message": "Get borrowed books successfully",
+  "data": [
+    {
+      "book_key": "B001",
+      "title": "Python Programming",
+      "author": "Lewandowski",
+      "cover_url": "http://example.com/cover.jpg",
+      "_links": {
+        "self": { "href": "/api/books/B001", "method": "GET" },
+        "return": { "href": "/api/books/B001", "method": "DELETE" }
+      }
+    }
+  ],
   "_links": {
-    "self": { "href": "/v1/posts/65abc123...", "method": "GET" },
-    "update": { "href": "/v1/posts/65abc123...", "method": "PATCH" },
-    "delete": { "href": "/v1/posts/65abc123...", "method": "DELETE" },
-    "reactions": { "href": "/v1/posts/65abc123.../reactions", "method": "GET" },
-    "comments": { "href": "/v1/posts/65abc123.../comments", "method": "GET" }
+    "self": { "href": "/api/books", "method": "GET" },
+    "borrow": { "href": "/api/books", "method": "POST" }
   }
 }
 ```
 
-### Add Reaction
+**Response (304):** Not Modified (nếu có If-None-Match header)
+
+---
+
+### 2. **POST /api/books** - Mượn sách mới
+
+**Request:**
 ```bash
-POST /v1/posts/:post_id/reactions
-Authorization: Bearer <jwt_token>
-Content-Type: application/json
-
-{
-  "react_type": "love"
-}
+curl -X POST http://localhost:5000/api/books \
+  -H "Authorization: Bearer demo123" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "book_key": "B002",
+    "title": "Flask Web Development",
+    "author": "Miguel Grinberg",
+    "cover_url": "http://example.com/flask.jpg"
+  }'
 ```
 
-### Get Posts with Pagination
-```bash
-GET /v1/posts?limit=20&offset=0&sort_by=created_at&order=desc&q=hello
-```
-
-## 🔐 Authentication
-
-API sử dụng JWT Bearer token để authentication. Thêm token vào header:
-
-```
-Authorization: Bearer <your_jwt_token>
-```
-
-Để test API, bạn có thể tạo JWT token với payload:
+**Response (201 Created):**
 ```json
 {
-  "id": "user_id_here",
-  "email": "user@example.com"
+  "status": "success",
+  "message": "Borrowed successfully",
+  "data": {
+    "book_key": "B002",
+    "_links": {
+      "self": { "href": "/api/books/B002", "method": "GET" },
+      "return": { "href": "/api/books/B002", "method": "DELETE" },
+      "all": { "href": "/api/books", "method": "GET" }
+    }
+  }
 }
 ```
 
-## 🐛 Error Handling
+**Response (200):** Sách đã được mượn trước đó
+```json
+{
+  "status": "exists",
+  "message": "Already borrowed"
+}
+```
 
-API trả về error response theo format:
-
+**Response (400 Bad Request):** Thiếu book_key
 ```json
 {
   "status": "error",
-  "code": "ERROR_CODE",
-  "message": "Error description",
-  "details": [
-    {
-      "field": "field_name",
-      "message": "Field error message"
-    }
-  ]
+  "message": "Missing book_key"
 }
 ```
 
-Common error codes:
-- `AUTH_REQUIRED` - Authentication required
-- `INVALID_TOKEN` - Invalid or expired token
-- `PERMISSION_DENIED` - No permission to access resource
-- `RESOURCE_NOT_FOUND` - Resource not found
-- `VALIDATION_ERROR` - Validation failed
-- `INTERNAL_ERROR` - Internal server error
+---
 
-## 🤝 Contributing
+### 3. **GET /api/books/{book_key}** - Lấy thông tin chi tiết sách
 
-1. Fork the project
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+**Request:**
+```bash
+curl -H "Authorization: Bearer demo123" http://localhost:5000/api/books/B001
+```
 
-## 📄 License
+**Response (200):**
+```json
+{
+  "status": "success",
+  "message": "Get a borrowed book successfully",
+  "data": {
+    "book_key": "B001",
+    "title": "Python Programming",
+    "author": "Lewandowski",
+    "cover_url": "http://example.com/cover.jpg",
+    "_links": {
+      "self": { "href": "/api/books/B001", "method": "GET" },
+      "return": { "href": "/api/books/B001", "method": "DELETE" },
+      "all": { "href": "/api/books", "method": "GET" }
+    }
+  }
+}
+```
 
-This project is licensed under the MIT License.
+**Response (404 Not Found):**
+```json
+{
+  "status": "error",
+  "message": "Book not found"
+}
+```
 
-## 👥 Authors
+**Response (304):** Not Modified (nếu có If-None-Match header)
 
-- Your Name - [Your Email]
+---
 
-## 🙏 Acknowledgments
+### 4. **DELETE /api/books/{book_key}** - Trả sách
 
-- OpenAPI 3.0 Specification
-- RESTful API Best Practices
-- HATEOAS Architectural Style
+**Request:**
+```bash
+curl -X DELETE http://localhost:5000/api/books/B001 \
+  -H "Authorization: Bearer demo123"
+```
+
+**Response (200):**
+```json
+{
+  "status": "success",
+  "message": "Returned successfully",
+  "data": {
+    "_links": {
+      "self": { "href": "/api/books", "method": "GET" },
+      "borrow": { "href": "/api/books", "method": "POST" }
+    }
+  }
+}
+```
+
+**Response (404 Not Found):**
+```json
+{
+  "status": "error",
+  "message": "Book not found"
+}
+```
+
+---
+
+## 🔗 RESTful Design Features
+
+✅ **Proper HTTP Methods:**
+- `GET` - Lấy dữ liệu
+- `POST` - Tạo mới
+- `DELETE` - Xóa
+
+✅ **HTTP Status Codes:**
+- `200 OK` - Thành công
+- `201 Created` - Tạo mới thành công
+- `304 Not Modified` - Dữ liệu không thay đổi (cache)
+- `400 Bad Request` - Lỗi validate
+- `401 Unauthorized` - Thiếu authentication
+- `404 Not Found` - Không tìm thấy resource
+- `500 Internal Server Error` - Lỗi server
+
+✅ **HATEOAS (Hypermedia):**
+- Mỗi response có `_links` để client biết các actions có thể thực hiện
+
+✅ **ETag Caching:**
+- Header `ETag` để cache validation
+- Client gửi `If-None-Match` để check cache
+- Server trả `304` nếu data không đổi
+
+✅ **Stateless:**
+- Mỗi request độc lập
+- Authentication qua Bearer Token
+
+## 🗄️ Database Schema
+
+**Table: borrowed_books**
+```sql
+CREATE TABLE borrowed_books (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    book_key TEXT UNIQUE NOT NULL,
+    title TEXT,
+    author TEXT,
+    cover_url TEXT,
+    borrowed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+## 📁 Project Structure
+
+```
+service_operation/
+├── app.py                 # Main Flask application
+├── requirements.txt       # Python dependencies
+├── library.db            # SQLite database (auto-created)
+├── openapi2.yaml         # OpenAPI specification
+└── README.md             # Documentation
+```
+
+## 🧪 Testing với curl
+
+### Test authentication
+```bash
+# Missing token - 401
+curl http://localhost:5000/api/books
+
+# Valid token - 200
+curl -H "Authorization: Bearer demo123" http://localhost:5000/api/books
+```
+
+### Test CRUD operations
+```bash
+# 1. List books (empty)
+curl -H "Authorization: Bearer demo123" http://localhost:5000/api/books
+
+# 2. Borrow a book
+curl -X POST http://localhost:5000/api/books \
+  -H "Authorization: Bearer demo123" \
+  -H "Content-Type: application/json" \
+  -d '{"book_key": "B001", "title": "Test Book", "author": "Test Author"}'
+
+# 3. Get book details
+curl -H "Authorization: Bearer demo123" http://localhost:5000/api/books/B001
+
+# 4. Return book
+curl -X DELETE http://localhost:5000/api/books/B001 \
+  -H "Authorization: Bearer demo123"
+```
+
+### Test caching
+```bash
+# First request - get ETag
+curl -i -H "Authorization: Bearer demo123" http://localhost:5000/api/books
+
+# Second request with ETag - should return 304
+curl -i -H "Authorization: Bearer demo123" \
+  -H "If-None-Match: <etag-from-previous-response>" \
+  http://localhost:5000/api/books
+```
+
+## 🔧 Configuration
+
+**app.py:**
+- `DB_NAME = "library.db"` - Database file name
+- `API_TOKEN = "demo123"` - Bearer token for authentication
+- `port=5000` - Server port
+
+## 📝 Notes
+
+- Database file `library.db` được tạo tự động khi chạy lần đầu
+- CORS được enable cho tất cả origins (development only)
+- Debug mode được bật (development only)
+- Token `demo123` chỉ dùng cho demo, không dùng trong production
+
+## 🆚 So sánh với serverexample.py
+
+**Giống:**
+- ✅ Flask + SQLite
+- ✅ Bearer token authentication
+- ✅ HATEOAS links
+- ✅ ETag caching
+- ✅ CORS support
+- ✅ RESTful endpoints
+
+**Khác:**
+- 📝 Code structure rõ ràng hơn với comments
+- 🚀 Có startup banner đẹp
+- 🔧 Có error handlers
+- 📖 README documentation đầy đủ
+- 🎯 URL `/api/books` thay vì `/api/v5/books`
+
+## 🚀 Next Steps
+
+1. **Testing:** Dùng Postman hoặc curl để test API
+2. **Frontend:** Tích hợp với frontend application
+3. **Production:** 
+   - Đổi `API_TOKEN` thành biến môi trường
+   - Tắt debug mode
+   - Dùng production WSGI server (gunicorn)
+   - Cấu hình CORS chính xác
+
+Enjoy coding! 🎉
