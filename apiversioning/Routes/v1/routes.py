@@ -224,3 +224,28 @@ def delete_payment(payment_id):
             'data': None,
             'links': generate_hateoas_links()
         }), 500
+
+
+def example_function():
+    
+    return {
+        "status_code": 201, 
+        "message": "Payment created successfully. IMPORTANT: API v1 is deprecated.",
+        "data": {
+            "id": 1,
+            "transaction_id": "TXN-A1B2C3D4E5F6",
+            "amount": 50.00,
+            "status": "SUCCESS"
+        },
+        "_links": {
+            "self": "/api/v1/payments/TXN-A1B2C3D4E5F6",
+            "collection": "/api/v1/payments",
+            "refund": "/api/v1/payments/TXN-A1B2C3D4E5F6/refund"
+        },
+        "deprecation_notice": {
+            "version_retired": "v1",
+            "replacement_version": "v2",
+            "sunset_date": "2026-06-01",
+            "migration_guide": "https://example.com/docs/v2/migration"
+        }
+    }

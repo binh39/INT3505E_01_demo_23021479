@@ -1,0 +1,334 @@
+openapi: 3.0.3
+info:
+  title: Library API
+  version: 1.0.0
+  description: >
+    Simple RESTful API for managing borrowed books.  
+    Supports operations for borrowing, returning, and listing books.
+
+servers:
+  - url: http://localhost:5000
+
+security:
+  - BearerAuth: []
+
+paths:
+  /books:
+    get:
+      tags:
+        - Books
+      summary: Get borrowed books
+      operationId: getBorrowedBooks
+      parameters:
+        - $ref: "#/components/parameters/IfNoneMatchHeader"
+      responses:
+        "200":
+          description: Success. Returns a list of borrowed books.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETagHeader"
+            Cache-Control:
+              $ref: "#/components/headers/CacheControlHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookListResponse"
+              examples:
+                successList:
+                  value:
+                    status: "success"
+                    message: "Get borrowed books successfully"
+                    data:
+                      - book_key: "B001"
+                        title: "Python Programming"
+                        author: "Lewandowski"
+                        cover_url: "http://cover.url/b001"
+                        _links:
+                          self: { href: "/api/books/B001", method: "GET" }
+                          return: { href: "/api/books/B001", method: "DELETE" }
+                    _links:
+                      {
+                        self: { href: "/api/books", method: "GET" },
+                        borrow: { href: "/api/books", method: "POST" },
+                      }
+        "304":
+          $ref: "#/components/responses/NotModified"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+    post:
+      tags:
+        - Books
+      summary: Borrow a new book (Create Resource)
+      operationId: borrowBook
+      requestBody:
+        description: book_key is required.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookCreateRequest"
+            examples:
+              newBook:
+                value:
+                  book_key: "NEW2024"
+                  title: "New Book 2024"
+                  author: "Robert"
+                  cover_url: "http://cover.url/new2024"
+
+      responses:
+        "201":
+          description: Book borrowed successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookBorrowResponse"
+              examples:
+                borrowSuccess:
+                  value:
+                    status: "success"
+                    message: "Borrowed successfully"
+                    data:
+                      book_key: "NEW2024"
+                      _links:
+                        self: { href: "/api/books/NEW2024", method: "GET" }
+                        return: { href: "/api/books/NEW2024", method: "DELETE" }
+                        all: { href: "/api/books", method: "GET" }
+        "200":
+          description: Book already exists and has been borrowed before (Backend returns 200).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimpleStatusResponse"
+              examples:
+                alreadyExists:
+                  value: { status: "exists", message: "Already borrowed" }
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /books/{book_key}:
+    parameters:
+      - $ref: "#/components/parameters/BookKeyParameter"
+
+    get:
+      tags:
+        - Books
+      summary: Get details of a borrowed book
+      operationId: getSingleBorrowedBook
+
+      parameters:
+        - $ref: "#/components/parameters/IfNoneMatchHeader"
+
+      responses:
+        "200":
+          description: Success. Returns book information.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETagHeader"
+            Cache-Control:
+              $ref: "#/components/headers/CacheControlHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SingleBookResponse"
+              examples:
+                singleBookFound:
+                  value:
+                    status: "success"
+                    message: "Get a borrowed book successfully"
+                    data:
+                      book_key: "B001"
+                      title: "Python Programming"
+                      author: "Lewandowski"
+                      cover_url: "http://cover.url/b001"
+                      _links:
+                        self: { href: "/api/books/B001", method: "GET" }
+                        return: { href: "/api/books/B001", method: "DELETE" }
+                        all: { href: "/api/books", method: "GET" }
+        "304":
+          $ref: "#/components/responses/NotModified"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+    delete:
+      tags:
+        - Books
+      summary: Return a borrowed book (Delete Resource)
+      operationId: returnBook
+
+      responses:
+        "200":
+          description: Book returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReturnSuccessResponse"
+              examples:
+                returnSuccess:
+                  value:
+                    status: "success"
+                    message: "Returned successfully"
+                    _links:
+                      all: { href: "/api/books", method: "GET" }
+                      borrow: { href: "/api/books", method: "POST" }
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+components:
+  schemas:
+    LinkObject:
+      type: object
+      properties:
+        href: { type: string, format: url }
+        method: { type: string, enum: [GET, POST, PUT, DELETE] }
+
+    HateoasLinks:
+      type: object
+      additionalProperties:
+        $ref: "#/components/schemas/LinkObject"
+
+    SimpleStatusResponse:
+      type: object
+      properties:
+        status: { type: string }
+        message: { type: string }
+
+    BookCreateRequest:
+      type: object
+      required:
+        - book_key
+      properties:
+        book_key: { type: string, description: Book key, example: B005 }
+        title:
+          { type: string, description: Book Title, example: RESTful Design }
+        author: { type: string, description: Author, example: Roy Fielding }
+        cover_url:
+          {
+            type: string,
+            format: url,
+            description: URL book cover,
+            example: http://book.covers/b005.jpg,
+          }
+
+    BorrowedBook:
+      type: object
+      properties:
+        book_key: { type: string }
+        title: { type: string }
+        author: { type: string }
+        cover_url: { type: string, format: url }
+        _links:
+          type: object
+          properties:
+            self: { $ref: "#/components/schemas/LinkObject" }
+            return: { $ref: "#/components/schemas/LinkObject" }
+
+    BookListResponse:
+      allOf:
+        - $ref: "#/components/schemas/SimpleStatusResponse"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/BorrowedBook"
+            _links: { $ref: "#/components/schemas/HateoasLinks" }
+
+    SingleBookResponse:
+      allOf:
+        - $ref: "#/components/schemas/SimpleStatusResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/BorrowedBook"
+            _links: { $ref: "#/components/schemas/HateoasLinks" }
+
+    BookBorrowResponse:
+      allOf:
+        - $ref: "#/components/schemas/SimpleStatusResponse"
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                book_key: { type: string }
+                _links: { $ref: "#/components/schemas/HateoasLinks" }
+
+    ReturnSuccessResponse:
+      allOf:
+        - $ref: "#/components/schemas/SimpleStatusResponse"
+        - type: object
+          properties:
+            _links: { $ref: "#/components/schemas/HateoasLinks" }
+
+  parameters:
+    BookKeyParameter:
+      name: book_key
+      in: path
+      required: true
+      description: Book key
+      schema:
+        type: string
+        example: B001
+    IfNoneMatchHeader:
+      name: If-None-Match
+      in: header
+      required: false
+      description: ETag received from the previous response, used for cache validation (304 Not Modified).
+      schema:
+        type: string
+        example: c1d2e3f4g5h6i7j8
+
+  headers:
+    ETagHeader:
+      description: ETag representing the state of the resource, used for caching.
+      schema: { type: string }
+    CacheControlHeader:
+      schema: { type: string }
+
+  responses:
+    NotFound:
+      description: Resource not found (404 Not Found)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/SimpleStatusResponse"
+          examples:
+            bookNotFound:
+              value: { status: "error", message: "Book not found" }
+    Unauthorized:
+      description: Authentication failed or missing Bearer Token (401 Unauthorized)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/SimpleStatusResponse"
+          examples:
+            unauthorized:
+              value: { status: "error", message: "Unauthorized" }
+    BadRequest:
+      description: Invalid request (400 Bad Request)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/SimpleStatusResponse"
+          examples:
+            missingKey:
+              value: { status: "error", message: "Missing book_key" }
+    NotModified:
+      description: Resource not modified since last access (304 Not Modified).
+      headers:
+        ETag:
+          $ref: "#/components/headers/ETagHeader"
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: CustomToken
+      description: Use Bearer Token ("Bearer demo123") for authentication.

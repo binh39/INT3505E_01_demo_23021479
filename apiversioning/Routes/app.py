@@ -1,4 +1,4 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request, redirect
 from flask_cors import CORS
 from v1.routes import v1_bp
 from v2.routes import v2_bp
@@ -12,11 +12,33 @@ CORS(app)
 app.register_blueprint(v1_bp)
 app.register_blueprint(v2_bp)
 
+IS_V2_ENABLED = False  # Set to True to enable V2, False to force V1
+
+@app.before_request
+def feature_toggle_router():
+    """
+    If IS_V2_ENABLED = False: All requests use V1 only
+    If IS_V2_ENABLED = True: Allow both V1 and V2 (or redirect V1 to V2)
+    """
+    if request.path in ['/', '/health']:
+        return
+    
+    if not IS_V2_ENABLED and request.path.startswith('/api/v2'):
+        # Redirect V2 requests to V1
+        new_path = request.path.replace('/api/v2/transactions', '/api/v1/payments', 1)
+        print(f"V2 is disabled. Redirecting: {request.path} → {new_path}")
+        return redirect(new_path)
+
 @app.route('/')
 def index():
     """Root endpoint with API information."""
     return jsonify({
-        'message': 'Payment API Demo - API Versioning',
+        'message': 'Payment API Demo - API Versioning with Feature Toggle',
+        'feature_toggle': {
+            'IS_V2_ENABLED': IS_V2_ENABLED,
+            'description': 'Controls whether V2 API is accessible',
+            'behavior': 'V2 blocked and redirected to V1' if not IS_V2_ENABLED else 'Both V1 and V2 accessible'
+        },
         'versions': {
             'v1': {
                 'base_url': '/api/v1',
@@ -34,11 +56,11 @@ def index():
                     'transaction_by_id': '/api/v2/transactions/{id}',
                     'migration_guide': '/api/v2/migration-guide'
                 },
-                'status': 'current',
+                'status': 'enabled' if IS_V2_ENABLED else 'disabled (redirects to V1)',
                 'breaking_changes': 'See /api/v2/migration-guide for details'
             }
         },
-        'recommended_version': 'v2'
+        'recommended_version': 'v2' if IS_V2_ENABLED else 'v1'
     })
 
 @app.route('/health')

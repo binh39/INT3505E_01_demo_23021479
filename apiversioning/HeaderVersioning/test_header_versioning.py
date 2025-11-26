@@ -12,7 +12,7 @@ BASE_URL = 'http://localhost:5001'
 def print_test_header(test_name: str):
     """Print formatted test header."""
     print("\n" + "=" * 80)
-    print(f"🧪 TEST: {test_name}")
+    print(f"TEST: {test_name}")
     print("=" * 80)
 
 
@@ -69,7 +69,7 @@ def test_v1_get_all_payments():
     data = response.json()
     assert 'status_code' in data, "V1 should have status_code"
     assert 'data' in data
-    print("\n✅ V1 format confirmed: has 'status_code'")
+    print("\nV1 format confirmed: has 'status_code'")
 
 
 def test_v1_create_payment():
@@ -97,7 +97,7 @@ def test_v1_create_payment():
     payment = data['data']
     assert 'transaction_id' in payment, "V1 should have transaction_id"
     assert 'card_number' in payment, "V1 should have card_number"
-    print(f"\n✅ V1 format confirmed: has transaction_id = {payment['transaction_id']}")
+    print(f"\nV1 format confirmed: has transaction_id = {payment['transaction_id']}")
     
     return payment['id']
 
@@ -145,7 +145,7 @@ def test_v2_get_all_transactions():
     data = response.json()
     assert 'code' in data, "V2 should have 'code' not 'status_code'"
     assert 'data' in data
-    print("\n✅ V2 format confirmed: has 'code' instead of 'status_code'")
+    print("\nV2 format confirmed: has 'code' instead of 'status_code'")
 
 
 def test_v2_create_transaction_with_token():
@@ -174,7 +174,7 @@ def test_v2_create_transaction_with_token():
     assert 'transaction_id' not in transaction, "V2 should NOT have transaction_id"
     assert 'payment_token' in transaction, "V2 should have payment_token"
     assert 'code' in transaction, "V2 data should have code field"
-    print("\n✅ V2 format confirmed: NO transaction_id, has payment_token")
+    print("\nV2 format confirmed: NO transaction_id, has payment_token")
     
     return transaction['id']
 
@@ -200,11 +200,11 @@ def test_v2_create_transaction_with_card_number():
     data = response.json()
     
     if 'deprecation_warning' in data:
-        print(f"\n⚠️  Deprecation Warning: {data['deprecation_warning']}")
+        print(f"\nDeprecation Warning: {data['deprecation_warning']}")
     
     transaction = data['data']
     assert 'payment_token' in transaction, "Should auto-generate payment_token"
-    print(f"\n✅ Auto-generated token: {transaction['payment_token']}")
+    print(f"\nAuto-generated token: {transaction['payment_token']}")
     
     return transaction['id']
 
@@ -251,7 +251,7 @@ def test_no_header_defaults_to_v1():
     assert response.status_code == 200
     data = response.json()
     assert 'status_code' in data, "Should default to V1 format"
-    print("\n✅ Confirmed: No header defaults to V1")
+    print("\nConfirmed: No header defaults to V1")
 
 
 def test_invalid_version_header():
@@ -265,7 +265,7 @@ def test_invalid_version_header():
     assert response.status_code == 400
     data = response.json()
     assert 'error' in data or 'message' in data
-    print("\n✅ Confirmed: Invalid version rejected")
+    print("\nConfirmed: Invalid version rejected")
 
 
 def test_same_endpoint_different_versions():
@@ -275,13 +275,13 @@ def test_same_endpoint_different_versions():
     endpoint = f"{BASE_URL}/api/payments"
     
     # V1 request
-    print("\n📤 Request 1: API-Version: 1")
+    print("\nRequest 1: API-Version: 1")
     v1_response = requests.get(endpoint, headers={'API-Version': '1'})
     v1_data = v1_response.json()
     print(f"V1 Response: {json.dumps(v1_data, indent=2)}")
     
     # V2 request
-    print("\n📤 Request 2: API-Version: 2")
+    print("\nRequest 2: API-Version: 2")
     v2_response = requests.get(endpoint, headers={'API-Version': '2'})
     v2_data = v2_response.json()
     print(f"V2 Response: {json.dumps(v2_data, indent=2)}")
@@ -291,7 +291,7 @@ def test_same_endpoint_different_versions():
     assert 'code' in v2_data, "V2 should have code"
     assert 'status_code' not in v2_data, "V2 should NOT have status_code"
     
-    print("\n✅ Confirmed: Same URL, different formats based on header!")
+    print("\nConfirmed: Same URL, different formats based on header!")
 
 
 # ============================================================================
@@ -300,9 +300,7 @@ def test_same_endpoint_different_versions():
 
 def run_all_tests():
     """Run all tests in sequence."""
-    print("\n" + "🎯" * 40)
     print("STARTING HEADER-BASED VERSIONING API TESTS")
-    print("🎯" * 40)
     
     try:
         # Basic tests
@@ -330,20 +328,18 @@ def run_all_tests():
         test_same_endpoint_different_versions()
         
         # Summary
-        print("\n" + "✅" * 40)
         print("ALL TESTS PASSED!")
-        print("✅" * 40)
-        print("\n📊 Test Summary:")
-        print("   ✅ Root & Health endpoints")
-        print("   ✅ V1 API (Header: API-Version: 1)")
-        print("   ✅ V2 API (Header: API-Version: 2)")
-        print("   ✅ Default to V1 when no header")
-        print("   ✅ Invalid version rejection")
-        print("   ✅ Same endpoint, different formats")
-        print("\n🎉 Header-based versioning working perfectly!")
-        print("\n💡 Key Insight:")
-        print("   Same URL (/api/payments) returns different formats")
-        print("   based on the API-Version header!")
+        print("\nTest Summary:")
+        print("Root & Health endpoints")
+        print("V1 API (Header: API-Version: 1)")
+        print("V2 API (Header: API-Version: 2)")
+        print("Default to V1 when no header")
+        print("Invalid version rejection")
+        print("Same endpoint, different formats")
+        print("\nHeader-based versioning working perfectly!")
+        print("\nKey Insight:")
+        print("Same URL (/api/payments) returns different formats")
+        print("based on the API-Version header!")
         
     except AssertionError as e:
         print("\n" + "❌" * 40)
