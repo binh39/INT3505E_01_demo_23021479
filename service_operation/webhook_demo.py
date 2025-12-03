@@ -1,9 +1,3 @@
-"""
-Webhook Demo Script
-===================
-Demo gửi webhook events đến webhook receiver service.
-"""
-
 import requests
 import json
 from datetime import datetime

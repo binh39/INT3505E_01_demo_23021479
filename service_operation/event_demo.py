@@ -1,10 +1,3 @@
-"""
-Demo: Event-Driven Architecture Pattern
-This script demonstrates Publisher-Subscriber pattern with async event handling
-
-Run this script: python event_demo.py
-"""
-
 import time
 import threading
 from datetime import datetime
