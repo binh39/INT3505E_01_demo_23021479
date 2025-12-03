@@ -37,7 +37,7 @@ def init_db():
     
     conn.commit()
     conn.close()
-    print(f"✅ HeaderVersioning database initialized: {DB_PATH}")
+    print(f"HeaderVersioning database initialized: {DB_PATH}")
 
 
 def seed_sample_data():
@@ -47,7 +47,7 @@ def seed_sample_data():
     
     cursor.execute('SELECT COUNT(*) FROM payments')
     if cursor.fetchone()[0] > 0:
-        print("⚠️  Database already contains data. Skipping seed.")
+        print("Database already contains data. Skipping seed.")
         conn.close()
         return
     
@@ -97,7 +97,7 @@ def seed_sample_data():
     
     conn.commit()
     conn.close()
-    print(f"✅ Seeded {len(sample_payments)} sample payments")
+    print(f"Seeded {len(sample_payments)} sample payments")
 
 
 def reset_db():

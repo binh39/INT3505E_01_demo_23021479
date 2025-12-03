@@ -1,19 +1,24 @@
 from flask import Flask, jsonify, request, g
 from database import init_db, seed_sample_data
-
-
+import v1.routes as v1
+import v2.routes as v2
 app = Flask(__name__)
 
-# Initialize database
 init_db()
 seed_sample_data()
 
 
 @app.before_request
 def detect_version():
-    """Detect API version from header before processing request."""
-    api_version = request.headers.get('API-Version', 'v1').lower()
+    """Detect API version from query parameter before processing request."""
+    # Skip for root endpoint
+    if request.path == '/':
+        return
     
+    # Get version from query parameter
+    api_version = request.args.get('version', '1')
+    
+    # Normalize version
     if api_version in ['1', 'v1']:
         g.api_version = 'v1'
     elif api_version in ['2', 'v2']:
@@ -21,24 +26,11 @@ def detect_version():
     else:
         g.api_version = 'v1'  # Default to v1
 
-
-# Import route functions directly from modules
-import v1.routes as v1
-import v2.routes as v2
-
-@app.route('/api/health', methods=['GET'])
-def route_health_check():
-    """Route health check to correct version based on API-Version header."""
-    if g.api_version == 'v2':
-        return v2.health_check()
-    else:
-        return v1.health_check()
-
-
+# Custom routing - dispatch to correct module based on query parameter
 @app.route('/api/payments', methods=['GET', 'POST'])
 @app.route('/api/payments/<int:payment_id>', methods=['GET', 'DELETE'])
 def route_to_version(payment_id=None):
-    """Route to correct version based on API-Version header."""
+    """Route to correct version based on ?version= query parameter."""
     if g.api_version == 'v2':
         # Call V2 endpoint
         if request.method == 'GET':
@@ -66,33 +58,33 @@ def route_to_version(payment_id=None):
 @app.route('/')
 def index():
     return jsonify({
-        'message': 'Header-Based API Versioning Demo',
-        'description': 'Version is determined by API-Version HTTP header',
+        'message': 'Query Parameter API Versioning Demo',
+        'description': 'Version is determined by the ?version= query parameter',
         'usage': {
             'v1': {
-                'header': 'API-Version: v1',
+                'query_param': '?version=1',
                 'endpoints': [
-                    'GET /api/payments',
-                    'GET /api/payments/{id}',
-                    'POST /api/payments',
-                    'DELETE /api/payments/{id}'
+                    'GET /api/payments?version=1',
+                    'GET /api/payments/{id}?version=1',
+                    'POST /api/payments?version=1',
+                    'DELETE /api/payments/{id}?version=1'
                 ],
-                'example': 'curl -H "API-Version: v1" http://localhost:5001/api/payments'
+                'example': 'curl http://localhost:5003/api/payments?version=1'
             },
             'v2': {
-                'header': 'API-Version: v2',
+                'query_param': '?version=2',
                 'endpoints': [
-                    'GET /api/payments',
-                    'GET /api/payments/{id}',
-                    'POST /api/payments',
-                    'DELETE /api/payments/{id}'
+                    'GET /api/payments?version=2',
+                    'GET /api/payments/{id}?version=2',
+                    'POST /api/payments?version=2',
+                    'DELETE /api/payments/{id}?version=2'
                 ],
-                'example': 'curl -H "API-Version: v2" http://localhost:5001/api/payments'
+                'example': 'curl http://localhost:5003/api/payments?version=2'
             }
         },
-        'note': 'Same URL, different behavior based on header!'
+        'note': 'Same URL, different behavior based on query parameter!'
     })
 
 
-if __name__ == '__main__':    
-    app.run(debug=True, host='0.0.0.0', port=5001)
+if __name__ == '__main__':
+    app.run(debug=True, port=5003)

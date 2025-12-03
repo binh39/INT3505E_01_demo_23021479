@@ -39,7 +39,7 @@ def test_health_check_v1():
     """Test health check with V1 header."""
     print_test_header("Health Check - V1")
     headers = {'API-Version': '1'}
-    response = requests.get(f"{BASE_URL}/health", headers=headers)
+    response = requests.get(f"{BASE_URL}/api/health", headers=headers)
     print_response(response)
     assert response.status_code == 200
 
@@ -255,17 +255,17 @@ def test_no_header_defaults_to_v1():
 
 
 def test_invalid_version_header():
-    """Test invalid version header."""
-    print_test_header("Invalid Version Header - Should Return Error")
+    """Test invalid version header - should default to V1."""
+    print_test_header("Invalid Version Header - Should Default to V1")
     
     headers = {'API-Version': '99'}
     response = requests.get(f"{BASE_URL}/api/payments", headers=headers)
     print_response(response)
     
-    assert response.status_code == 400
+    assert response.status_code == 200
     data = response.json()
-    assert 'error' in data or 'message' in data
-    print("\nConfirmed: Invalid version rejected")
+    assert 'status_code' in data, "Invalid version should default to V1 format"
+    print("\nConfirmed: Invalid version defaults to V1")
 
 
 def test_same_endpoint_different_versions():
@@ -328,18 +328,23 @@ def run_all_tests():
         test_same_endpoint_different_versions()
         
         # Summary
-        print("ALL TESTS PASSED!")
+        print("\n" + "=" * 80)
+        print("✅ ALL TESTS PASSED!")
+        print("=" * 80)
         print("\nTest Summary:")
-        print("Root & Health endpoints")
-        print("V1 API (Header: API-Version: 1)")
-        print("V2 API (Header: API-Version: 2)")
-        print("Default to V1 when no header")
-        print("Invalid version rejection")
-        print("Same endpoint, different formats")
-        print("\nHeader-based versioning working perfectly!")
+        print("✅ Root & Health endpoints")
+        print("✅ V1 API (Header: API-Version: 1)")
+        print("✅ V2 API (Header: API-Version: 2)")
+        print("✅ Default to V1 when no header")
+        print("✅ Invalid version defaults to V1")
+        print("✅ Same endpoint, different formats")
+        print("\n" + "=" * 80)
+        print("Header-based versioning working perfectly!")
+        print("=" * 80)
         print("\nKey Insight:")
-        print("Same URL (/api/payments) returns different formats")
-        print("based on the API-Version header!")
+        print("📌 Same URL (/api/payments) returns different formats")
+        print("📌 Version determined by API-Version header!")
+        print("=" * 80)
         
     except AssertionError as e:
         print("\n" + "❌" * 40)

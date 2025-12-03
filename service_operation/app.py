@@ -1,20 +1,21 @@
-from flask import Flask, request, jsonify, make_response
+from flask import Flask, request, jsonify, make_response, g, Response
 import sqlite3
-import hashlib
 import json
+import uuid
+import time
+from logger import API_LOGGER as logger
+import metrics
+from prometheus_client import CONTENT_TYPE_LATEST
 from flask_cors import CORS
 from datetime import datetime
+from events import event_bus  # Event-driven pattern
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 
 # Configuration
 DB_NAME = "library.db"
-API_TOKEN = "demo123"
 
-# ============================================
-# Database Initialization
-# ============================================
 def init_db():
     """Initialize SQLite database with borrowed_books table"""
     conn = sqlite3.connect(DB_NAME)
@@ -35,39 +36,113 @@ def init_db():
 init_db()
 
 # ============================================
-# Authentication Middleware
+# Request Tracing Middleware
 # ============================================
-def check_auth():
-    """Check if request has valid Bearer token"""
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
-        return False
-    token = auth_header.split(" ")[1]
-    return token == API_TOKEN
-
 @app.before_request
-def require_auth():
-    """Require authentication for all endpoints except root and OPTIONS"""
-    if request.path == "/" or request.method == "OPTIONS":
-        return
-    if not check_auth():
-        return jsonify({
-            "status": "error",
-            "message": "Unauthorized"
-        }), 401
+def before_request_logging():
+    """Generate trace ID and log incoming request"""
+    # Generate unique trace ID for this request
+    g.trace_id = str(uuid.uuid4())
+    g.start_time = time.time()
+    # increment in-progress requests
+    try:
+        metrics.IN_PROGRESS.inc()
+    except Exception:
+        pass
+    
+    # Structured log for incoming request
+    headers = dict(request.headers)
+    if 'Authorization' in headers:
+        headers['Authorization'] = 'Bearer ***'
+
+    logger.info(
+        "Incoming Request",
+        extra={
+            'trace_id': g.trace_id,
+            'method': request.method,
+            'url': request.url,
+            'path': request.path,
+            'remote_addr': request.remote_addr,
+            'user_agent': str(request.user_agent),
+            'headers': headers
+        }
+    )
+
+    # Log request body for POST/PUT/PATCH requests when JSON
+    if request.method in ['POST', 'PUT', 'PATCH'] and request.is_json:
+        try:
+            body = request.get_json()
+        except Exception:
+            body = None
+        logger.info(
+            "Request Body",
+            extra={
+                'trace_id': g.trace_id,
+                'body': body
+            }
+        )
+
+@app.after_request
+def after_request_logging(response):
+    """Log response details and calculate request duration"""
+    if hasattr(g, 'trace_id'):
+        duration = (time.time() - g.start_time) * 1000  # Convert to milliseconds
+        
+        logger.info(
+            "Outgoing Response",
+            extra={
+                'trace_id': g.trace_id,
+                'status_code': response.status_code,
+                'duration_ms': round(duration, 2)
+            }
+        )
+        
+        # Add trace ID to response headers
+        response.headers['X-Trace-ID'] = g.trace_id
+        response.headers['X-Response-Time'] = f"{duration:.2f}ms"
+        
+        # Log response body
+        if response.is_json:
+            try:
+                resp_text = response.get_data(as_text=True)
+            except Exception:
+                resp_text = None
+            logger.info(
+                "Response Body",
+                extra={
+                    'trace_id': g.trace_id,
+                    'response': resp_text[:500] if resp_text else None
+                }
+            )
+        
+        # Log performance warning for slow requests
+        if duration > 1000:
+            logger.warning(
+                "Slow Request",
+                extra={
+                    'trace_id': g.trace_id,
+                    'duration_ms': round(duration, 2)
+                }
+            )
+
+        # observe prometheus metrics: latency (seconds) and request count
+        try:
+            metrics.REQUEST_LATENCY.labels(request.method, request.path).observe(duration / 1000.0)
+            metrics.REQUEST_COUNT.labels(request.method, request.path, str(response.status_code)).inc()
+        except Exception:
+            pass
+
+        # decrement in-progress requests
+        try:
+            metrics.IN_PROGRESS.dec()
+        except Exception:
+            pass
+    
+    return response
 
 # ============================================
 # Helper Functions
 # ============================================
-def generate_etag(data):
-    """Generate ETag hash for caching"""
-    return hashlib.md5(json.dumps(data, sort_keys=True).encode()).hexdigest()
-
-def check_etag(etag):
-    """Check if client's ETag matches current ETag"""
-    client_etag = request.headers.get("If-None-Match")
-    return client_etag == etag
-
 def create_hateoas_links(book_key=None):
     """Create HATEOAS links for resources"""
     if book_key:
@@ -109,11 +184,16 @@ def get_borrowed_books():
     GET /api/books - Get list of all borrowed books
     Returns: List of borrowed books with HATEOAS links
     """
+    trace_id = getattr(g, 'trace_id', 'unknown')
+    logger.info("Fetching all borrowed books", extra={'trace_id': trace_id})
+    
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     c.execute("SELECT book_key, title, author, cover_url FROM borrowed_books ORDER BY borrowed_at DESC")
     rows = c.fetchall()
     conn.close()
+    
+    logger.info("Found books", extra={'trace_id': trace_id, 'count': len(rows)})
 
     # Build response data
     books = [
@@ -127,12 +207,6 @@ def get_borrowed_books():
         for row in rows
     ]
 
-    # Generate ETag for caching
-    etag = generate_etag(books)
-    if check_etag(etag):
-        return make_response("", 304)
-
-    # Build response
     response_data = {
         "status": "success",
         "message": "Get borrowed books successfully",
@@ -141,9 +215,6 @@ def get_borrowed_books():
     }
 
     response = make_response(jsonify(response_data), 200)
-    response.headers["ETag"] = etag
-    response.headers["Cache-Control"] = "public, max-age=60"
-    response.headers["Access-Control-Expose-Headers"] = "ETag"
     
     return response
 
@@ -154,15 +225,20 @@ def borrow_book():
     Request Body: { "book_key": "B001", "title": "...", "author": "...", "cover_url": "..." }
     Returns: 201 Created or 200 if already exists
     """
+    trace_id = getattr(g, 'trace_id', 'unknown')
     data = request.get_json()
     
     # Validate required field
     book_key = data.get("book_key")
     if not book_key:
+        logger.error("Validation error: Missing book_key", extra={'trace_id': trace_id})
         return jsonify({
             "status": "error",
-            "message": "Missing book_key"
+            "message": "Missing book_key",
+            "trace_id": trace_id
         }), 400
+    
+    logger.info("Attempting to borrow book", extra={'trace_id': trace_id, 'book_key': book_key})
 
     # Optional fields
     title = data.get("title", "")
@@ -178,9 +254,11 @@ def borrow_book():
 
     if existing:
         conn.close()
+        logger.info("Book already borrowed", extra={'trace_id': trace_id, 'book_key': book_key})
         return jsonify({
             "status": "exists",
-            "message": "Already borrowed"
+            "message": "Already borrowed",
+            "trace_id": trace_id
         }), 200
 
     # Insert new borrowed book
@@ -191,20 +269,41 @@ def borrow_book():
         )
         conn.commit()
         conn.close()
-
+        
+        logger.info("Book borrowed successfully", extra={'trace_id': trace_id, 'book_key': book_key})
+        try:
+            metrics.BOOKS_BORROWED.inc()
+        except Exception:
+            pass
+        
+        # Publish event asynchronously (non-blocking)
+        event_bus.publish('book.borrowed', {
+            'book_key': book_key,
+            'title': title,
+            'author': author,
+            'trace_id': trace_id
+        })
+        
         return jsonify({
             "status": "success",
             "message": "Borrowed successfully",
             "data": {
                 "book_key": book_key,
                 "_links": create_hateoas_links(book_key)
-            }
+            },
+            "trace_id": trace_id
         }), 201
     except Exception as e:
         conn.close()
+        logger.error("Database error", extra={'trace_id': trace_id, 'error': str(e)})
+        try:
+            metrics.ERRORS.labels('database').inc()
+        except Exception:
+            pass
         return jsonify({
             "status": "error",
-            "message": f"Database error: {str(e)}"
+            "message": f"Database error: {str(e)}",
+            "trace_id": trace_id
         }), 500
 
 # ============================================
@@ -217,6 +316,9 @@ def get_book(book_key):
     GET /api/books/{book_key} - Get details of a specific borrowed book
     Returns: Book details with HATEOAS links
     """
+    trace_id = getattr(g, 'trace_id', 'unknown')
+    logger.info("Looking up book", extra={'trace_id': trace_id, 'book_key': book_key})
+    
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     c.execute(
@@ -227,10 +329,14 @@ def get_book(book_key):
     conn.close()
 
     if not book:
+        logger.warning("Book not found", extra={'trace_id': trace_id, 'book_key': book_key})
         return jsonify({
             "status": "error",
-            "message": "Book not found"
+            "message": "Book not found",
+            "trace_id": trace_id
         }), 404
+    
+    logger.info("Book found", extra={'trace_id': trace_id, 'book_key': book_key})
 
     # Build book data
     book_data = {
@@ -241,11 +347,6 @@ def get_book(book_key):
         "_links": create_hateoas_links(book[0])
     }
 
-    # Generate ETag for caching
-    etag = generate_etag(book_data)
-    if check_etag(etag):
-        return make_response("", 304)
-
     response_data = {
         "status": "success",
         "message": "Get a borrowed book successfully",
@@ -253,10 +354,6 @@ def get_book(book_key):
     }
 
     response = make_response(jsonify(response_data), 200)
-    response.headers["ETag"] = etag
-    response.headers["Cache-Control"] = "public, max-age=60"
-    response.headers["Access-Control-Expose-Headers"] = "ETag"
-    
     return response
 
 @app.route("/api/books/<book_key>", methods=["DELETE"])
@@ -265,6 +362,9 @@ def return_book(book_key):
     DELETE /api/books/{book_key} - Return a borrowed book
     Returns: 200 OK or 404 if not found
     """
+    trace_id = getattr(g, 'trace_id', 'unknown')
+    logger.info("Attempting to return book", extra={'trace_id': trace_id, 'book_key': book_key})
+    
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     c.execute("DELETE FROM borrowed_books WHERE book_key = ?", (book_key,))
@@ -273,17 +373,32 @@ def return_book(book_key):
     conn.close()
 
     if deleted == 0:
+        logger.warning("Book not found for deletion", extra={'trace_id': trace_id, 'book_key': book_key})
         return jsonify({
             "status": "error",
-            "message": "Book not found"
+            "message": "Book not found",
+            "trace_id": trace_id
         }), 404
 
+    logger.info("Book returned successfully", extra={'trace_id': trace_id, 'book_key': book_key})
+    try:
+        metrics.BOOKS_RETURNED.inc()
+    except Exception:
+        pass
+    
+    # Publish event asynchronously (non-blocking)
+    event_bus.publish('book.returned', {
+        'book_key': book_key,
+        'trace_id': trace_id
+    })
+    
     return jsonify({
         "status": "success",
         "message": "Returned successfully",
         "data": {
             "_links": create_hateoas_links()
-        }
+        },
+        "trace_id": trace_id
     }), 200
 
 # ============================================
@@ -293,37 +408,44 @@ def return_book(book_key):
 @app.errorhandler(404)
 def not_found(error):
     """Handle 404 errors"""
+    trace_id = getattr(g, 'trace_id', 'unknown')
+    logger.error("404 Error", extra={'trace_id': trace_id, 'url': request.url})
+    try:
+        metrics.ERRORS.labels('404').inc()
+    except Exception:
+        pass
     return jsonify({
         "status": "error",
-        "message": "Endpoint not found"
+        "message": "Endpoint not found",
+        "trace_id": trace_id
     }), 404
 
 @app.errorhandler(500)
 def internal_error(error):
     """Handle 500 errors"""
+    trace_id = getattr(g, 'trace_id', 'unknown')
+    logger.error("500 Error", extra={'trace_id': trace_id, 'error': str(error)})
+    try:
+        metrics.ERRORS.labels('500').inc()
+    except Exception:
+        pass
     return jsonify({
         "status": "error",
-        "message": "Internal server error"
+        "message": "Internal server error",
+        "trace_id": trace_id
     }), 500
 
-# ============================================
-# Run Application
-# ============================================
+
+@app.route('/metrics', methods=['GET'])
+def metrics_endpoint():
+    """Expose Prometheus metrics"""
+    try:
+        data, content_type = metrics.metrics_response()
+        return Response(data, mimetype=content_type)
+    except Exception as e:
+        logger.error("Metrics endpoint error", extra={'error': str(e)})
+        return jsonify({"status":"error","message":"Metrics unavailable"}), 500
+
 
 if __name__ == "__main__":
-    print("=" * 50)
-    print("🚀 Library API Server Starting...")
-    print("=" * 50)
-    print(f"📚 Database: {DB_NAME}")
-    print(f"🔑 Auth Token: Bearer {API_TOKEN}")
-    print(f"🌐 Server: http://localhost:5000")
-    print("=" * 50)
-    print("\n📖 Available Endpoints:")
-    print("  GET    /api/books          - List all borrowed books")
-    print("  POST   /api/books          - Borrow a new book")
-    print("  GET    /api/books/{key}    - Get book details")
-    print("  DELETE /api/books/{key}    - Return a book")
-    print("=" * 50)
-    print("\n✨ Starting server...\n")
-    
     app.run(debug=True, host="0.0.0.0", port=5000)
